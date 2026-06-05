@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DreamDojo 完整流程拆解 · 数据 / 处理 / 训练 / 推理</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Noto+Serif+SC:wght@500;700;900&family=Noto+Sans+SC:wght@300;400;500;700&family=Spline+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#f3ecdc;
+    --paper-2:#ece3cf;
+    --ink:#211d17;
+    --ink-soft:#544c3e;
+    --ink-faint:#8a8071;
+    --rust:#a8401f;
+    --rust-deep:#7d2c12;
+    --teal:#1f6b5e;
+    --ochre:#9a6a16;
+    --line:#cfc4ab;
+    --line-soft:#ddd3bb;
+    --font-display:'Fraunces','Noto Serif SC',serif;
+    --font-cn-head:'Noto Serif SC','Fraunces',serif;
+    --font-body:'Spline Sans','Noto Sans SC',sans-serif;
+    --font-mono:'IBM Plex Mono',monospace;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0;
+    background-color:var(--paper);
+    background-image:
+      repeating-linear-gradient(0deg, rgba(123,110,84,.045) 0 1px, transparent 1px 28px),
+      repeating-linear-gradient(90deg, rgba(123,110,84,.045) 0 1px, transparent 1px 28px);
+    color:var(--ink);
+    font-family:var(--font-body);
+    font-weight:400;
+    line-height:1.78;
+    font-size:16.5px;
+    -webkit-font-smoothing:antialiased;
+  }
+  ::selection{background:var(--rust);color:var(--paper);}
+
+  .wrap{max-width:980px;margin:0 auto;padding:0 28px 120px;}
+
+  /* ---------- HERO ---------- */
+  header.hero{
+    position:relative;
+    padding:88px 0 46px;
+    border-bottom:3px solid var(--ink);
+    margin-bottom:8px;
+  }
+  .kicker{
+    font-family:var(--font-mono);
+    font-size:12.5px;
+    letter-spacing:.34em;
+    text-transform:uppercase;
+    color:var(--rust);
+    margin:0 0 22px;
+    display:flex;gap:14px;align-items:center;
+  }
+  .kicker::before{content:"";flex:0 0 38px;height:2px;background:var(--rust);}
+  h1.title{
+    font-family:var(--font-cn-head);
+    font-weight:900;
+    font-size:clamp(34px,6.4vw,68px);
+    line-height:1.04;
+    margin:0 0 6px;
+    letter-spacing:-.5px;
+  }
+  h1.title .en{
+    display:block;
+    font-family:var(--font-display);
+    font-weight:600;
+    font-style:italic;
+    font-size:clamp(20px,3vw,34px);
+    color:var(--rust-deep);
+    letter-spacing:-.5px;
+    margin-top:10px;
+  }
+  .sub{
+    font-size:18px;
+    color:var(--ink-soft);
+    max-width:640px;
+    margin:26px 0 30px;
+  }
+  .meta{
+    display:flex;flex-wrap:wrap;gap:10px 26px;
+    font-family:var(--font-mono);
+    font-size:12.5px;
+    color:var(--ink-faint);
+    padding-top:22px;
+    border-top:1px solid var(--line);
+  }
+  .meta b{color:var(--ink);font-weight:600;}
+
+  /* corner crosses */
+  .cross{position:absolute;width:14px;height:14px;opacity:.5;}
+  .cross::before,.cross::after{content:"";position:absolute;background:var(--rust);}
+  .cross::before{left:6px;top:0;width:2px;height:14px;}
+  .cross::after{top:6px;left:0;height:2px;width:14px;}
+  .cross.tr{right:0;top:60px;}
+
+  /* ---------- LEGEND ---------- */
+  .legend{
+    display:grid;grid-template-columns:1fr 1fr;gap:16px;
+    margin:38px 0 14px;
+  }
+  @media(max-width:640px){.legend{grid-template-columns:1fr;}}
+  .legend .lg{
+    border:1.5px solid var(--line);
+    background:rgba(255,255,255,.32);
+    padding:16px 18px;border-radius:3px;
+    font-size:14px;color:var(--ink-soft);
+  }
+  .legend .lg .tag{margin-bottom:8px;}
+  .legend .lg.fact{border-left:5px solid var(--teal);}
+  .legend .lg.inf{border-left:5px dashed var(--ochre);}
+
+  .tag{
+    display:inline-flex;align-items:center;gap:6px;
+    font-family:var(--font-mono);
+    font-size:11px;font-weight:600;letter-spacing:.12em;
+    text-transform:uppercase;
+    padding:3px 9px;border-radius:2px;
+  }
+  .tag.fact{background:var(--teal);color:#eafaf6;}
+  .tag.inf{background:var(--ochre);color:#fdf4e0;}
+  .tag.fact::before{content:"◆";font-size:9px;}
+  .tag.inf::before{content:"◇";font-size:9px;}
+
+  /* ---------- TOC ---------- */
+  nav.toc{
+    position:sticky;top:0;z-index:30;
+    background:rgba(243,236,220,.93);
+    backdrop-filter:blur(6px);
+    border-bottom:1px solid var(--line);
+    margin:42px -28px 0;padding:11px 28px;
+    display:flex;flex-wrap:wrap;gap:6px 22px;
+    font-family:var(--font-mono);font-size:12px;
+  }
+  nav.toc a{color:var(--ink-soft);text-decoration:none;letter-spacing:.04em;transition:color .2s;}
+  nav.toc a:hover{color:var(--rust);}
+  nav.toc a b{color:var(--rust);}
+
+  /* ---------- SECTIONS ---------- */
+  section{padding:62px 0 8px;}
+  .sec-head{display:flex;align-items:flex-start;gap:22px;margin-bottom:30px;}
+  .sec-num{
+    font-family:var(--font-display);
+    font-weight:600;font-style:italic;
+    font-size:clamp(46px,9vw,86px);
+    line-height:.82;color:var(--rust);
+    flex:0 0 auto;
+  }
+  .sec-head h2{
+    font-family:var(--font-cn-head);
+    font-weight:700;font-size:clamp(24px,4.4vw,38px);
+    margin:6px 0 6px;line-height:1.16;letter-spacing:-.3px;
+  }
+  .sec-head .h2-en{
+    font-family:var(--font-mono);font-size:12px;letter-spacing:.26em;
+    text-transform:uppercase;color:var(--ink-faint);
+  }
+  h3{
+    font-family:var(--font-cn-head);
+    font-weight:700;font-size:21px;
+    margin:42px 0 12px;
+    padding-bottom:8px;border-bottom:1px solid var(--line);
+    display:flex;align-items:baseline;gap:11px;
+  }
+  h3 .nm{font-family:var(--font-mono);font-size:13px;color:var(--rust);font-weight:600;}
+  h4{font-family:var(--font-cn-head);font-weight:700;font-size:16.5px;margin:26px 0 6px;color:var(--rust-deep);}
+  p{margin:13px 0;}
+  strong{font-weight:600;color:var(--ink);}
+  .em{color:var(--rust-deep);font-weight:600;}
+
+  ul,ol{margin:13px 0;padding-left:4px;}
+  li{margin:9px 0;padding-left:26px;position:relative;list-style:none;}
+  ul li::before{content:"—";position:absolute;left:0;color:var(--rust);font-family:var(--font-mono);}
+  ol{counter-reset:li;}
+  ol li::before{counter-increment:li;content:counter(li,decimal-leading-zero);position:absolute;left:0;color:var(--rust);font-family:var(--font-mono);font-size:12px;top:3px;font-weight:600;}
+
+  /* ---------- CALLOUTS ---------- */
+  .call{
+    border:1px solid var(--line);
+    border-left-width:5px;
+    background:rgba(255,255,255,.4);
+    padding:14px 20px;margin:16px 0;border-radius:3px;
+  }
+  .call.fact{border-left-color:var(--teal);}
+  .call.inf{border-left-color:var(--ochre);border-left-style:dashed;background:rgba(154,106,22,.06);}
+  .call.note{border-left-color:var(--rust);background:rgba(168,64,31,.06);}
+  .call > .tag{margin-bottom:9px;}
+  .call p:first-of-type{margin-top:0;}
+  .call p:last-child{margin-bottom:0;}
+
+  /* ---------- EQUATION ---------- */
+  .eq{
+    font-family:var(--font-mono);
+    background:var(--ink);color:#f0ead9;
+    padding:14px 20px;margin:16px 0;border-radius:4px;
+    font-size:14.5px;overflow-x:auto;line-height:1.6;
+    box-shadow:5px 5px 0 rgba(168,64,31,.22);
+  }
+  .eq .lbl{color:var(--rust);float:right;font-size:12px;opacity:.85;}
+  .eq sub,.eq sup{font-size:.72em;}
+  .ink-mono{font-family:var(--font-mono);font-size:.9em;background:var(--paper-2);padding:1px 6px;border-radius:3px;border:1px solid var(--line-soft);}
+
+  /* ---------- TABLE ---------- */
+  .tbl-wrap{overflow-x:auto;margin:20px 0;border:1px solid var(--ink);border-radius:3px;}
+  table{border-collapse:collapse;width:100%;font-size:13.5px;background:rgba(255,255,255,.32);}
+  caption{caption-side:top;text-align:left;font-family:var(--font-mono);font-size:11.5px;letter-spacing:.08em;color:var(--ink-faint);padding:0 0 10px;text-transform:uppercase;}
+  th,td{padding:9px 12px;text-align:left;border-bottom:1px solid var(--line-soft);vertical-align:top;}
+  thead th{background:var(--ink);color:var(--paper);font-family:var(--font-mono);font-size:11.5px;letter-spacing:.06em;font-weight:500;text-transform:uppercase;border-bottom:none;}
+  tbody tr:nth-child(even){background:rgba(123,110,84,.05);}
+  tbody tr:hover{background:rgba(168,64,31,.07);}
+  td.hi{font-family:var(--font-mono);color:var(--rust-deep);font-weight:600;}
+  .row-total td{background:var(--paper-2)!important;font-weight:600;border-top:2px solid var(--ink);}
+  .stage-tbl th:first-child,.stage-tbl td:first-child{font-family:var(--font-cn-head);font-weight:700;color:var(--rust-deep);white-space:nowrap;}
+
+  /* ---------- FLOW DIAGRAM ---------- */
+  .flow{display:flex;flex-wrap:wrap;align-items:stretch;gap:0;margin:26px 0;}
+  .flow .node{
+    flex:1 1 150px;min-width:150px;
+    border:1.5px solid var(--ink);background:rgba(255,255,255,.4);
+    padding:16px 16px;position:relative;border-radius:3px;
+  }
+  .flow .node + .node{margin-left:30px;}
+  .flow .node::after{
+    content:"→";position:absolute;right:-26px;top:50%;transform:translateY(-50%);
+    font-family:var(--font-mono);color:var(--rust);font-size:20px;font-weight:600;
+  }
+  .flow .node:last-child::after{display:none;}
+  .flow .node .ph{font-family:var(--font-mono);font-size:11px;color:var(--rust);letter-spacing:.1em;}
+  .flow .node .t{font-family:var(--font-cn-head);font-weight:700;font-size:16px;margin:5px 0 4px;}
+  .flow .node .d{font-size:12.5px;color:var(--ink-soft);line-height:1.5;}
+  @media(max-width:720px){
+    .flow .node + .node{margin-left:0;margin-top:30px;}
+    .flow .node::after{right:50%;top:auto;bottom:-26px;transform:translateX(50%) rotate(90deg);}
+  }
+
+  /* io grid */
+  .io{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:16px 0;}
+  @media(max-width:600px){.io{grid-template-columns:1fr;}}
+  .io .box{border:1px solid var(--line);border-radius:3px;padding:14px 16px;background:rgba(255,255,255,.35);}
+  .io .box .h{font-family:var(--font-mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--rust);margin-bottom:6px;}
+  .io .box.in{border-top:4px solid var(--teal);}
+  .io .box.out{border-top:4px solid var(--rust);}
+
+  footer{margin-top:80px;padding-top:28px;border-top:3px solid var(--ink);font-size:13px;color:var(--ink-faint);font-family:var(--font-mono);line-height:1.7;}
+  footer b{color:var(--ink);}
+
+  /* reveal animation */
+  .reveal{opacity:0;transform:translateY(18px);animation:rise .8s cubic-bezier(.2,.7,.3,1) forwards;}
+  @keyframes rise{to{opacity:1;transform:none;}}
+  header.hero .reveal:nth-child(1){animation-delay:.05s}
+  header.hero .reveal:nth-child(2){animation-delay:.16s}
+  header.hero .reveal:nth-child(3){animation-delay:.27s}
+  header.hero .reveal:nth-child(4){animation-delay:.38s}
+  @media(prefers-reduced-motion:reduce){.reveal{animation:none;opacity:1;transform:none;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <span class="cross tr"></span>
+    <p class="kicker reveal">机器人世界模型 · 流程逐层拆解</p>
+    <h1 class="title reveal">DreamDojo 完整流程拆解
+      <span class="en">Data · Processing · Training · Inference</span>
+    </h1>
+    <p class="sub reveal">从数据采集（细到组成成分）、数据处理、三阶段策略训练（各阶段输入/输出、数据来源、损失），到部署推理（输入/输出、如何控制）的端到端梳理 —— 并逐条区分<span class="em">论文证实的事实</span>与<span class="em">推断的工程细节</span>。</p>
+    <div class="meta reveal">
+      <span><b>论文</b> DreamDojo (NVIDIA et al.)</span>
+      <span><b>arXiv</b> 2602.06949</span>
+      <span><b>骨干</b> Cosmos-Predict2.5</span>
+      <span><b>语料</b> 44,711 h 第一人称人类视频</span>
+    </div>
+  </header>
+
+  <div class="legend">
+    <div class="lg fact"><span class="tag fact">事实</span> 论文（或官方仓库）明确陈述的内容。下文凡带此标记或写在「事实」框内的，均可在原文中直接找到依据。</div>
+    <div class="lg inf"><span class="tag inf">推断</span> 论文未明说、但可合理推断或属于隐含工程细节的内容。复现时需以官方代码/仓库为准。</div>
+  </div>
+
+  <nav class="toc">
+    <a href="#s1"><b>01</b> 数据采集与组成</a>
+    <a href="#s2"><b>02</b> 数据处理</a>
+    <a href="#s3"><b>03</b> 策略训练（三阶段）</a>
+    <a href="#s4"><b>04</b> 部署与推理</a>
+    <a href="#s5"><b>05</b> 一页速查表</a>
+  </nav>
+
+  <!-- ============ 00 总览 ============ -->
+  <section id="s0">
+    <p style="font-size:17px;color:var(--ink-soft);">一句话定位：DreamDojo 是一个<strong>视频世界模型</strong> —— 给它当前画面 + 一串动作，它"脑补"出未来视频。核心做法是先用海量<strong>人类第一人称视频</strong>学物理，用"潜动作"绕开人类视频没有动作标签的难题，再在小规模目标机器人数据上微调，最后蒸馏成实时自回归模型。整条管线分三阶段：</p>
+    <div class="flow">
+      <div class="node"><span class="ph">PHASE 01</span><div class="t">人类视频预训练</div><div class="d">In-lab + EgoDex + DreamDojo-HV，潜动作作统一条件</div></div>
+      <div class="node"><span class="ph">PHASE 02</span><div class="t">目标机器人后训练</div><div class="d">重置动作层，小规模真机数据全量微调</div></div>
+      <div class="node"><span class="ph">PHASE 03</span><div class="t">蒸馏</div><div class="d">转成因果自回归、few-step，实时 10.81 FPS</div></div>
+    </div>
+  </section>
+
+  <!-- ============ 01 数据 ============ -->
+  <section id="s1">
+    <div class="sec-head">
+      <span class="sec-num">01</span>
+      <div><div class="h2-en">Data Collection &amp; Composition</div><h2>数据采集与组成成分</h2></div>
+    </div>
+
+    <p>DreamDojo 的预训练<strong>完全建立在第一人称（egocentric）人类视频</strong>上，而非传统遥操作机器人数据。立场是：人类与机器人在交互时<strong>底层物理一致</strong>，因此知识可跨 embodiment 迁移。</p>
+
+    <h3><span class="nm">1.1</span> 三个人类数据源</h3>
+    <div class="call fact"><span class="tag fact">事实</span>
+    <p>预训练语料由三块拼成（论文 Table 1），DreamDojo-HV 占绝对主体（≈98% 时长）：</p>
+    </div>
+
+    <div class="tbl-wrap">
+      <table>
+        <caption>Table 1 — 数据组成（Human Videos）</caption>
+        <thead><tr><th>数据源</th><th>时长</th><th>轨迹数</th><th>技能数</th><th>场景数</th><th>采集方式</th></tr></thead>
+        <tbody>
+          <tr><td class="hi">In-lab</td><td>55 h</td><td>13.9k</td><td>35</td><td>1</td><td>实验室桌面；戴 Manus 手套 + Vive Ultimate Tracker 捕捉精确手姿</td></tr>
+          <tr><td class="hi">EgoDex</td><td>829 h</td><td>30k</td><td>194</td><td>5</td><td>公开数据集；Apple Vision Pro 录制，自带高精度 3D 手指姿态</td></tr>
+          <tr><td class="hi">DreamDojo-HV</td><td>43,827 h</td><td>1,135k</td><td>6,015 †</td><td>1,135k</td><td>自建；众包采集，覆盖家庭/工业/零售/教育/行政等</td></tr>
+          <tr class="row-total"><td>合计 Mixture</td><td>44,711 h</td><td>1,179k</td><td>≥6,015</td><td>≥1,135k</td><td>人类交互语料，迄今世界模型预训练规模最大</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <ul>
+      <li><span class="tag fact">事实</span> 三源各司其职：In-lab 用于"验证核心设计"，EgoDex 用于"丰富物体多样性"，DreamDojo-HV 提供规模与多样性主体。</li>
+      <li><span class="tag fact">事实</span> 全量含 &gt;9,869 个独立场景、6,015 个任务、43,237 个独立物体。作者宣称比此前最大的世界模型数据集多 <span class="em">15× 时长、96× 技能、2,000× 场景</span>。</li>
+      <li><span class="tag fact">事实</span> 技能数 6,015（标 †）是用 <strong>GPT 基于每段视频的全局语言标注估计</strong> 的，非人工精确统计。</li>
+      <li><span class="tag fact">事实</span> 每个 episode 都带一段文本任务描述。</li>
+    </ul>
+
+    <div class="call inf"><span class="tag inf">推断</span>
+    <p><strong>口径不一致须注意：</strong>Table 1 里 DreamDojo-HV 的"场景数"=1,135k，正好等于轨迹数；但正文又说"&gt;9,869 unique scenes"。合理推断是：表中"scene"把每段众包片段各算一个场景（=片段数），而 9,869 是<strong>去重后的独立场景/地点</strong>数。读"环境多样性"时应以 9,869 为准，别把 1,135k 当真实环境数。</p>
+    </div>
+
+    <h3><span class="nm">1.2</span> 额外的机器人数据</h3>
+    <div class="call fact"><span class="tag fact">事实</span>
+    <p>In-house 机器人数据集 <strong>Unitree G1、Fourier GR-1、AgiBot、YAM</strong> 不参与人类视频预训练，而是用于：(a) 训练潜动作模型；(b) 作为 post-training 的目标 embodiment；(c) 构建评测集。</p>
+    </div>
+
+    <h3><span class="nm">1.3</span> 动作标签从哪来？自带还是额外处理？</h3>
+    <p>分两类看：</p>
+    <ul>
+      <li><span class="tag fact">事实</span> <strong>文本任务描述 — 数据自带</strong>（采集/众包时人工标注）。</li>
+      <li><span class="tag fact">事实</span> <strong>真正喂给世界模型的动作条件 — 主要靠额外处理得到</strong>。In-lab 自带 Manus 手姿（需 retarget 成 GR-1 动作）；EgoDex 自带 3D 手指姿态（论文又转成 MANO）；占 98% 的 DreamDojo-HV <strong>完全没有动作标签，只有文本</strong>。因此论文统一改用<strong>潜动作（latent action）</strong>，由一个自监督模型从相邻两帧自动算出，给所有视频打"代理标签"。</li>
+    </ul>
+    <div class="call inf"><span class="tag inf">推断</span>
+    <p>In-lab 由 Manus 手姿 retarget 到 GR-1 的具体重定向管线、众包数据的清洗/质控流程、文本标注的具体 schema，论文均未展开。</p>
+    </div>
+
+    <h3><span class="nm">1.4</span> 数据可得性（现状）</h3>
+    <div class="call note"><span class="tag inf">现状 · 截至 2026-06，须以官方为准</span>
+    <p>据官方 GitHub 仓库更新日志，已放出的是：<strong>预训练+后训练代码、全部 2B/14B 权重、GR-1 后训练数据集、评测集</strong>。<strong>那 44k 小时的 DreamDojo-HV 预训练大语料并未放出</strong>，下载不到（仓库 "Datasets" 链接指向的是 GR-1 遥操作后训练集，不是预训练语料）。三块里只有 EgoDex 是 Apple 的独立公开数据集可单独获取；In-lab(55h) 与众包主体(43.8k h，98%) 不开源。常见原因（推断）：隐私/肖像、众包同意书范围、PB 级分发成本。</p>
+    </div>
+  </section>
+
+  <!-- ============ 02 处理 ============ -->
+  <section id="s2">
+    <div class="sec-head">
+      <span class="sec-num">02</span>
+      <div><div class="h2-en">Data Processing</div><h2>数据处理</h2></div>
+    </div>
+
+    <div class="call fact"><span class="tag fact">事实</span>
+    <p>处理环节的关键操作如下：</p>
+    </div>
+    <ul>
+      <li><strong>时间降采样（temporal downsampling）= 跳帧。</strong>按随机因子 {1,2,3,4} 抽帧：因子 1 全取（原速）、因子 2 隔一帧取一帧（2× 快进），以此类推。目的：原视频相邻帧动作差异极小，跳帧后让相邻帧动作幅度变大、节奏更多样，使潜动作模型覆盖从慢到快的运动。主要服务于潜动作模型训练。</li>
+      <li><strong>空间分辨率：</strong>潜动作模型用 320×240；世界模型用 640×480（均 center crop + resize）。注意它与时间降采样是两回事（一个砍帧、一个砍像素）。</li>
+      <li><strong>序列切片：</strong>预训练/后训练切成长度 13 的序列。</li>
+      <li><strong>相对动作（relative action）：</strong>不用绝对关节位姿，而以每个 latent frame 起点（即每 4 个 timestep）的位姿做 rebaseline 转成相对动作。理由：相对动作分布更窄、跨轨迹共享，降低建模复杂度、增强泛化。</li>
+      <li><strong>动作分块（chunking）：</strong>WAN2.2 tokenizer 时间压缩比为 4（一个 video latent x<sub>i</sub> 对应像素空间连续 4 帧），故把连续 4 个动作 a<sub>t:t+4</sub> 拼成一个 chunk，注入对应 latent frame。</li>
+    </ul>
+
+    <h4>补充：动作分块到底在管什么？（常见疑问）</h4>
+    <p>输出确实是<strong>视频帧</strong>；分块管的是<strong>输入端动作条件如何对齐与屏蔽</strong>，两个作用：① <strong>对齐粒度</strong> —— 让"4 动作一块"正好对上"1 latent frame = 4 画面帧"；② <strong>遵守因果、防偷看未来</strong> —— 若把整条动作轨迹当全局条件喂给所有 latent frame，模型算前面帧时会"看到"未来才该发生的动作，造成因果混淆；分块让每个 latent frame 只看它该看的那 4 个动作。实验 (Table 5) 证实加 chunked injection 后 PSNR 明显上升。</p>
+  </section>
+
+  <!-- ============ 03 训练 ============ -->
+  <section id="s3">
+    <div class="sec-head">
+      <span class="sec-num">03</span>
+      <div><div class="h2-en">Policy / Model Training</div><h2>策略训练（三阶段）</h2></div>
+    </div>
+
+    <h3><span class="nm">3.0</span> 骨干：Cosmos-Predict2.5</h3>
+    <div class="call fact"><span class="tag fact">事实</span>
+    <p>世界模型本体基于预训练的 <strong>Cosmos-Predict2.5</strong>（latent video diffusion + DiT），在 WAN2.2 tokenizer 的连续潜空间中运作，用 flow matching 训练。<strong>架构并非从零设计。</strong>语言经 cross-attention 注入，timestep 经 sinusoidal→MLP→adaptive layer norm 调制。</p>
+    </div>
+    <div class="eq"><span class="lbl">Eq. 1 · 世界模型定义</span>s<sub>t+1</sub> &nbsp;~&nbsp; p( · | s<sub>t</sub>, a<sub>t</sub> )</div>
+    <div class="eq"><span class="lbl">Eq. 2 · flow matching</span>L<sub>flow</sub>(&theta;) = E ‖ u(x<sub>t</sub>, t, c; &theta;) &minus; v<sub>t</sub> ‖² &nbsp;,&nbsp; v<sub>t</sub> = &epsilon; &minus; x</div>
+
+    <h4>两处架构改进（基于骨干）</h4>
+    <ul>
+      <li><span class="tag fact">事实</span> <strong>相对动作变换</strong>（见 §2）：降低建模复杂度，增强对连续/组合动作的泛化。</li>
+      <li><span class="tag fact">事实</span> <strong>分块动作注入</strong>（见 §2）：缓解因果混淆，提升可控性。</li>
+    </ul>
+
+    <!-- 阶段一 -->
+    <h3><span class="nm">3.1</span> 阶段一 · 人类视频预训练</h3>
+    <p><strong>核心难题（事实）：</strong>人类视频没有细粒度动作标签。直接被动预测未来帧能迁移部分物理，但缺乏因果性，迁移到机器人后交互性差。</p>
+
+    <h4>解决方案：连续潜动作作为统一 proxy</h4>
+    <div class="call fact"><span class="tag fact">事实</span>
+    <p>训练一个<strong>潜动作模型</strong>（VAE + 时空 Transformer，Genie 风格），带 information bottleneck：Encoder 取相邻两帧 f<sub>t:t+1</sub> → 提取时空特征 → 投影到低维 embedding â<sub>t</sub>；Decoder 用 â<sub>t</sub> + 前一帧 f<sub>t</sub> → 预测下一帧 f<sub>t+1</sub>。瓶颈强迫模型 disentangle 出关键动作信息。不用 HaMeR/MANO 等现成手姿提取器的理由：它们只能描述手、表达不了手臂与移动、遮挡/相机运动下不稳、且 embodiment gap 大时迁移差。</p>
+    </div>
+    <div class="eq"><span class="lbl">Eq. 3 · 潜动作 VAE</span>L<sub>pred</sub> = E<sub>q</sub>[ log p(f<sub>t+1</sub> | â, f<sub>t</sub>) ] &minus; &beta; · D<sub>KL</sub>( q(â | f<sub>t:t+1</sub>) ‖ p(â) )</div>
+
+    <div class="io">
+      <div class="box in"><div class="h">输入 / Input</div>人类视频帧序列（长 13）+ 每个 latent frame 上 chunk 化的潜动作条件 + <strong>空文本 prompt</strong>（事实：文本固定为空）</div>
+      <div class="box out"><div class="h">输出 / Output</div>预测的未来视频帧（去噪速度场 velocity）</div>
+    </div>
+
+    <ul>
+      <li><span class="tag fact">事实</span> 潜动作经 lightweight MLP 投影到 timestep embedding 维度；<strong>MLP 最后一层零初始化</strong>（ControlNet 式），避免训练初期扰动预训练权重，经验上改善 physics；再与 timestep embedding 相加，喂入每个 DiT block 的 adaptive layer norm。</li>
+      <li><span class="tag fact">事实</span> 数据采样比 <strong>In-lab : EgoDex : DreamDojo-HV = 1 : 2 : 10</strong>。</li>
+    </ul>
+
+    <h4>训练目标：加入时间一致性损失</h4>
+    <p><span class="tag fact">事实</span> 标准 flow matching 单独监督每帧、忽略时间相关性。论文加一项匹配相邻帧速度差的损失，加速学动作可控性、增强物体完整性、减少 artifacts。</p>
+    <div class="eq"><span class="lbl">Eq. 4 · 时间一致性</span>L<sub>temporal</sub> = E [ &Sigma;<sub>i=1</sub><sup>K&minus;1</sup> ‖ (z<sub>i+1</sub> &minus; z<sub>i</sub>) &minus; (v<sub>i+1</sub> &minus; v<sub>i</sub>) ‖² ]</div>
+    <div class="eq"><span class="lbl">Eq. 5 · 最终目标</span>L<sub>final</sub> = L<sub>flow</sub> + &lambda; · L<sub>temporal</sub> &nbsp;,&nbsp; &lambda; = 0.1</div>
+
+    <!-- 阶段二 -->
+    <h3><span class="nm">3.2</span> 阶段二 · 目标机器人后训练</h3>
+    <div class="call fact"><span class="tag fact">事实</span>
+    <p>把目标机器人的真实动作 flatten 成序列，整段过 action MLP；<strong>重新初始化 action MLP 第一层</strong> 以匹配目标动作空间，然后<strong>全量 finetune 所有预训练权重</strong>。靠强预训练，目标机器人数据可在有限域、小规模采集仍达 zero-shot 泛化。</p>
+    </div>
+    <div class="io">
+      <div class="box in"><div class="h">输入 / Input</div>长 13 序列；<strong>第一帧为条件帧</strong>；原始动作处理成长 12 的相对动作 chunk（目标机器人真实动作）</div>
+      <div class="box out"><div class="h">输出 / Output</div>目标机器人在该动作下的未来视频帧</div>
+    </div>
+
+    <!-- 阶段三 -->
+    <h3><span class="nm">3.3</span> 阶段三 · 蒸馏（Self Forcing）</h3>
+    <p><span class="tag fact">事实</span> 目的：实现<strong>自回归 + 实时</strong>。瓶颈：双向注意力固定 horizon、去噪步数太多（如 50）。基于 Self Forcing，把 teacher G<sub>teacher</sub> 蒸馏成 student G<sub>student</sub>：同架构同权重，但<strong>双向注意力→因果注意力</strong>、步数缩到 few-step（如 4）、滑窗 12 帧。</p>
+
+    <h4>① Warmup 阶段</h4>
+    <p>student 用 teacher forcing（上下文来自 teacher 生成的 latent），回归到 teacher 的 ODE 解。</p>
+    <div class="eq"><span class="lbl">Eq. 6 · warmup</span>L<sub>warmup</sub> = E ‖ G<sub>student</sub>(x<sub>t</sub>, t) &minus; x<sub>0</sub> ‖² &nbsp;&nbsp;(x<sub>0</sub> 来自 teacher ODE 轨迹)</div>
+
+    <h4>② Distillation 阶段</h4>
+    <p>student 改用<strong>自己之前生成的 latent</strong> 作上下文，对齐训练/推理分布、减少 compounding error；用 distribution matching loss（teacher/student 的 KL）。为对抗长程误差累积，让 student 生成 N′ &gt; N 帧（N 为 teacher horizon），随机选大小 N 的窗口接收梯度。</p>
+    <div class="eq"><span class="lbl">Eq. 7 · 分布匹配</span>L<sub>distill</sub> = D<sub>KL</sub>( p<sub>teacher</sub> ‖ p<sub>student</sub> )</div>
+    <div class="eq"><span class="lbl">Eq. 8 · 梯度</span>&nabla;L<sub>distill</sub> = &minus; E [ ( s<sub>real</sub>(x<sub>t</sub>,t) &minus; s<sub>fake</sub>(x<sub>t</sub>,t) ) · dG<sub>student</sub>/d&theta; ]</div>
+    <p style="font-size:13.5px;color:var(--ink-soft);"><span class="ink-mono">s<sub>real</sub></span> 由 G<sub>teacher</sub> 估计，<span class="ink-mono">s<sub>fake</sub></span> 由训练在 G<sub>student</sub> 输出上的模型估计。</p>
+
+    <div class="call inf"><span class="tag inf">推断</span>
+    <p>方法部分未给死 N、N′ 的具体取值（实验部分"训练时随机生成 13–49 帧、对最后 13 帧算 loss"可视作对应实现）；s<sub>fake</sub> 那个 "fake diffusion model" 的训练细节较略。</p>
+    </div>
+  </section>
+
+  <!-- ============ 04 推理 ============ -->
+  <section id="s4">
+    <div class="sec-head">
+      <span class="sec-num">04</span>
+      <div><div class="h2-en">Deployment &amp; Inference</div><h2>部署与推理 · 如何控制</h2></div>
+    </div>
+
+    <div class="call fact"><span class="tag fact">事实</span>
+    <p>推理设置：teacher 用 <strong>35 步</strong>去噪；蒸馏后 student 用 <strong>4 步</strong>；<strong>关闭 CFG</strong>（经验上收益有限）。student 最终在 <strong>640×480、10.81 FPS</strong> 自回归预测任意长度，连续交互 &gt;1 分钟不退化。</p>
+    </div>
+
+    <div class="io">
+      <div class="box in"><div class="h">世界模型输入</div>条件帧（student 可多帧上下文）+ 动作条件（相对动作 chunk）</div>
+      <div class="box out"><div class="h">世界模型输出</div>未来视频帧（自回归续帧）</div>
+    </div>
+    <p>"控制"= 改变喂进去的动作条件。三种下游用法对应三种控制方式：</p>
+
+    <h3><span class="nm">4.1</span> Live Teleoperation · 实时遥操作</h3>
+    <div class="call fact"><span class="tag fact">事实</span>
+    <p>在装 <strong>RTX 5090</strong> 的本地桌面跑 DreamDojo-2B，接 <strong>PICO VR 控制器</strong>捕捉 G1 机器人的上半身动作输入，实时遥操作"虚拟机器人"。<em>通俗：</em>给机器人做了个超写实电子游戏，你直接在游戏里操控它，零硬件损耗。</p>
+    </div>
+    <div class="call inf"><span class="tag inf">推断</span>
+    <p>VR 控制器输出如何<strong>实时</strong>转成模型需要的相对动作并 chunk 注入的完整工程管线，论文未给。</p>
+    </div>
+
+    <h3><span class="nm">4.2</span> Model-based Planning · 在线规划</h3>
+    <div class="call fact"><span class="tag fact">事实</span>
+    <p>集成 5 个训练 checkpoint 生成有方差的动作 proposal → 送进 DreamDojo 预测未来视频（用 distilled 2B 批量处理）→ 一个<strong>外部 value model</strong> 打分 → 选最优 proposal 由机器人执行。<em>通俗：</em>像下棋先在脑子里推演几步、挑最有利那步走。</p>
+    </div>
+    <div class="call inf"><span class="tag inf">推断 / 附录细节</span>
+    <p>value model 基于 DINOv2，取 4 帧 clip，DINOv2 backbone 冻结、独立提每帧特征，再经 global-attention 的 value head，估计到下一个子任务边界（相邻子任务语言标注间的关键帧）的剩余步数，按数据集最大子任务间隔归一化；滑窗 stride 1，选 value 最低（最接近完成）的 proposal 执行。value model 的训练数据具体来源/规模较略。</p>
+    </div>
+
+    <h3><span class="nm">4.3</span> Policy Evaluation · 策略评估</h3>
+    <div class="call fact"><span class="tag fact">事实</span>
+    <p>用相同初始帧让世界模型整段模拟一条 ~80s rollout，人工按真实世界相同标准打成功率，作为真机的替代评估器。<em>通俗：</em>给机器人策略做"虚拟考试"，分数与真机高度一致，从而靠它筛选 checkpoint。</p>
+    </div>
+    <p style="font-size:14px;color:var(--ink-soft);">三者共同点：<strong>把"必须在真机上试错"换成"在模型里试错"</strong> —— 这正是世界模型对机器人最大的价值。</p>
+  </section>
+
+  <!-- ============ 05 速查表 ============ -->
+  <section id="s5">
+    <div class="sec-head">
+      <span class="sec-num">05</span>
+      <div><div class="h2-en">One-Page Cheat Sheet</div><h2>一页速查表（各阶段训练细节）</h2></div>
+    </div>
+    <div class="call fact"><span class="tag fact">事实</span><p>下表数据均取自论文实验设置（§4.1）。</p></div>
+    <div class="tbl-wrap">
+      <table class="stage-tbl">
+        <caption>各阶段 · 数据 / 输入 / 输出 / 损失 / 算力</caption>
+        <thead><tr><th>阶段</th><th>训练数据来源</th><th>输入 → 输出</th><th>主要损失</th><th>关键设置 / 算力</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>潜动作模型</td>
+            <td>3 人类集 + 4 机器人集 (G1/GR-1/AgiBot/YAM)</td>
+            <td>相邻 2 帧 → 重建下一帧 + 低维潜动作 â</td>
+            <td>重建 + KL (Eq.3)，β=1e-6</td>
+            <td>700M 时空 Transformer；24 enc+24 dec；潜维 32；320×240；降采样{1,2,3,4}；400k step；batch 256；AdamW lr 2.5e-5；from scratch</td>
+          </tr>
+          <tr>
+            <td>预训练</td>
+            <td>In-lab : EgoDex : DreamDojo-HV = 1:2:10</td>
+            <td>帧序列(13)+chunk潜动作+空文本 → 未来帧</td>
+            <td>L<sub>flow</sub>+0.1·L<sub>temporal</sub> (Eq.5)</td>
+            <td>init from Cosmos-Predict2.5；2B & 14B；640×480；140k step；有效 batch 1024；256×H100；AdamW wd 0.1 lr 1.6e-4；维护 EMA</td>
+          </tr>
+          <tr>
+            <td>后训练</td>
+            <td>目标机器人真机 (G1/GR-1/AgiBot)，~10 Hz</td>
+            <td>条件帧+真机相对动作(12) → 未来帧</td>
+            <td>同预训练（flow+temporal）</td>
+            <td>reinit action MLP 第一层 + 全量 finetune；序列 13；默认 128×H100；50k step；batch 512</td>
+          </tr>
+          <tr>
+            <td>蒸馏·warmup</td>
+            <td>teacher 生成的 10k ODE 轨迹</td>
+            <td>teacher forcing 上下文 → 回归 teacher 解</td>
+            <td>L<sub>warmup</sub> (Eq.6)</td>
+            <td>student 由 teacher 初始化；因果注意力；滑窗 12；10k iter；64×H100；batch 256</td>
+          </tr>
+          <tr>
+            <td>蒸馏·distill</td>
+            <td>student 自生成 latent（自举）</td>
+            <td>自生成上下文 → 对齐 teacher 分布</td>
+            <td>DMD / KL (Eq.7–8)</td>
+            <td>随机生成 13–49 帧、对末 13 帧算 loss；3k iter；64×H100；batch 64</td>
+          </tr>
+          <tr class="row-total">
+            <td>推理（部署）</td>
+            <td>—</td>
+            <td>条件帧+动作 chunk → 实时续帧</td>
+            <td>—</td>
+            <td>teacher 35 步 / student 4 步；CFG 关闭；640×480 @ 10.81 FPS</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3><span class="nm">5.1</span> 贡献归类（具体而非空泛）</h3>
+    <ul>
+      <li><strong>数据集（最主要、最硬）：</strong>DreamDojo-HV / 整体 44,711 h，迄今世界模型预训练规模最大、最多样的人类视频语料。</li>
+      <li><strong>训练策略（核心方法）：</strong>以连续潜动作作跨 embodiment 的统一动作条件，解决人类视频无标签的迁移难题；配套"预训练→后训练→蒸馏"三阶段配方。</li>
+      <li><strong>训练/架构小改进（非全新架构）：</strong>相对动作 + 分块注入 + 时间一致性损失。</li>
+      <li><strong>蒸馏管线：</strong>在 Self Forcing 上做到实时自回归（10.81 FPS）并以短上下文改善长程一致性与抗遮挡。</li>
+    </ul>
+    <p style="font-size:14px;color:var(--ink-soft);">真正"新"的集中在 <strong>数据规模 + 用潜动作打通"人类视频→机器人世界模型"的训练配方</strong>；骨干、潜动作、蒸馏框架都是在 Cosmos-Predict2.5、AdaWorld、Genie、Self Forcing 等已有工作上的组合与扩展。</p>
+  </section>
+
+  <footer>
+    <b>来源</b> · 论文 DreamDojo (arXiv 2602.06949) 正文与附录；数据可得性据 NVIDIA/DreamDojo 官方 GitHub 仓库更新日志（截至 2026-06）。<br>
+    <b>说明</b> · ◆事实 = 原文/官方明确陈述；◇推断 = 合理推断或隐含工程细节，复现以官方代码为准。本文档为阅读梳理，非官方材料。
+  </footer>
+
+</div>
+</body>
+</html>

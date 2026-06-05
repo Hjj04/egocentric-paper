@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Donk 全流程逐层解析 · 数据 → 处理 → 训练 → 推理</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,500&family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans+SC:wght@300;400;500;700&family=Noto+Serif+SC:wght@500;600;700;900&display=swap" rel="stylesheet">
+
+<script>
+MathJax = {
+  tex: {
+    inlineMath: [['$', '$'], ['\\(', '\\)']],
+    displayMath: [['$$', '$$'], ['\\[', '\\]']]
+  },
+  svg: { fontCache: 'global' },
+  options: { renderActions: { addMenu: [] } }
+};
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-svg.min.js" id="MathJax-script" async></script>
+
+<style>
+:root{
+  --paper:#F6F3EB;
+  --paper-2:#FCFAF4;
+  --ink:#1E1E1A;
+  --ink-soft:#52514A;
+  --ink-faint:#86847A;
+  --rule:#E2DBC9;
+  --rule-soft:#ECE6D7;
+  --accent:#1C4E6B;
+  --accent-2:#0F3A52;
+  --accent-wash:#E8EFF2;
+  --fact:#2E7D52;
+  --fact-bg:#E8F1EA;
+  --fact-line:#B6D6C2;
+  --fact-ink:#1E5D3B;
+  --inf:#A85E18;
+  --inf-bg:#F6ECDB;
+  --inf-line:#E6CEA3;
+  --inf-ink:#8A4D14;
+  --rust:#9C4221;
+  --shadow:0 1px 2px rgba(40,35,20,.05), 0 8px 28px -18px rgba(40,35,20,.30);
+}
+
+*{box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{
+  margin:0;
+  background:var(--paper);
+  color:var(--ink);
+  font-family:"Noto Sans SC", system-ui, sans-serif;
+  font-weight:400;
+  line-height:1.85;
+  font-size:16px;
+  letter-spacing:.005em;
+  -webkit-font-smoothing:antialiased;
+  background-image:
+    radial-gradient(circle at 12% -5%, rgba(28,78,107,.05), transparent 38%),
+    radial-gradient(circle at 95% 8%, rgba(156,66,33,.045), transparent 32%);
+}
+
+/* progress */
+#progress{
+  position:fixed;top:0;left:0;height:3px;width:100%;
+  background:linear-gradient(90deg,var(--accent),var(--rust));
+  transform:scaleX(0);transform-origin:0 50%;
+  z-index:200;
+}
+
+/* ===== layout ===== */
+.wrap{
+  max-width:1180px;margin:0 auto;padding:0 28px;
+  display:grid;grid-template-columns:236px minmax(0,1fr);gap:54px;
+}
+.toc-col{position:relative;}
+.toc{
+  position:sticky;top:30px;
+  padding:22px 18px;
+  border:1px solid var(--rule);border-radius:14px;
+  background:linear-gradient(180deg,var(--paper-2),rgba(252,250,244,.6));
+  box-shadow:var(--shadow);
+}
+.toc .toc-kick{
+  font-family:"Fraunces",serif;font-style:italic;
+  font-size:12px;letter-spacing:.08em;color:var(--accent);
+  text-transform:uppercase;margin-bottom:10px;display:block;
+}
+.toc ol{list-style:none;margin:0;padding:0;counter-reset:t;}
+.toc li{counter-increment:t;margin:1px 0;}
+.toc a{
+  display:flex;gap:9px;align-items:baseline;
+  text-decoration:none;color:var(--ink-soft);
+  font-size:13.5px;line-height:1.45;
+  padding:6px 9px;border-radius:8px;border-left:2px solid transparent;
+  transition:all .18s ease;
+}
+.toc a::before{
+  content:counter(t,decimal-leading-zero);
+  font-family:"JetBrains Mono",monospace;font-size:11px;
+  color:var(--ink-faint);min-width:18px;
+}
+.toc a:hover{background:var(--accent-wash);color:var(--accent-2);}
+.toc a.active{
+  background:var(--accent-wash);color:var(--accent-2);font-weight:500;
+  border-left-color:var(--accent);
+}
+.toc .legend{
+  margin-top:16px;padding-top:14px;border-top:1px dashed var(--rule);
+  font-size:11.5px;line-height:1.5;color:var(--ink-faint);
+}
+.toc .legend .lg{display:flex;gap:7px;align-items:center;margin:6px 0;}
+.toc .legend .dot{width:9px;height:9px;border-radius:50%;flex:none;}
+
+/* ===== header ===== */
+header.hero{padding:64px 0 30px;}
+.eyebrow{
+  font-family:"Fraunces",serif;font-style:italic;font-weight:500;
+  color:var(--rust);font-size:14px;letter-spacing:.04em;margin:0 0 14px;
+}
+.hero h1{
+  font-family:"Noto Serif SC","Fraunces",serif;font-weight:900;
+  font-size:clamp(30px,4.6vw,52px);line-height:1.12;margin:0 0 8px;
+  letter-spacing:-.01em;color:var(--ink);
+}
+.hero h1 .wm{
+  font-family:"Fraunces",serif;font-weight:600;font-style:normal;
+  color:var(--accent);letter-spacing:0;
+}
+.hero .sub{
+  font-size:17px;color:var(--ink-soft);max-width:62ch;margin:14px 0 0;
+}
+.hero .meta{
+  margin-top:22px;display:flex;flex-wrap:wrap;gap:8px 10px;font-size:12.5px;
+}
+.pill{
+  font-family:"JetBrains Mono",monospace;font-size:11.5px;
+  padding:5px 11px;border-radius:999px;border:1px solid var(--rule);
+  background:var(--paper-2);color:var(--ink-soft);
+}
+.pill b{color:var(--accent-2);font-weight:700;}
+
+/* ===== pipeline strip ===== */
+.flow{
+  margin:30px 0 10px;padding:24px 22px;border-radius:16px;
+  border:1px solid var(--rule);background:var(--paper-2);box-shadow:var(--shadow);
+}
+.flow-title{
+  font-family:"Fraunces",serif;font-style:italic;font-size:13px;
+  color:var(--accent);letter-spacing:.05em;margin-bottom:16px;
+}
+.flow-row{display:flex;align-items:stretch;gap:8px;flex-wrap:wrap;}
+.fstep{
+  flex:1 1 130px;min-width:120px;
+  border:1px solid var(--rule);border-radius:12px;
+  background:linear-gradient(180deg,#fff,var(--paper-2));
+  padding:13px 14px;position:relative;
+}
+.fstep .n{
+  font-family:"JetBrains Mono",monospace;font-size:10.5px;color:var(--rust);
+  letter-spacing:.1em;
+}
+.fstep .t{font-family:"Noto Serif SC",serif;font-weight:700;font-size:15px;margin-top:3px;}
+.fstep .d{font-size:11.5px;color:var(--ink-faint);line-height:1.5;margin-top:4px;}
+.farrow{display:flex;align-items:center;color:var(--accent);font-size:20px;flex:none;}
+.fbranch{
+  display:flex;gap:8px;margin-top:14px;padding-top:14px;
+  border-top:1px dashed var(--rule);flex-wrap:wrap;
+}
+.fmode{
+  flex:1 1 240px;border-radius:12px;padding:12px 15px;font-size:13px;
+  border:1px solid var(--rule);
+}
+.fmode.ti{background:var(--accent-wash);border-color:var(--fact-line);}
+.fmode.t2{background:#FBF1E2;border-color:var(--inf-line);}
+.fmode .mh{font-family:"Noto Serif SC",serif;font-weight:700;display:flex;gap:8px;align-items:center;}
+.fmode .mh code{font-family:"JetBrains Mono",monospace;font-size:11px;background:rgba(0,0,0,.05);padding:2px 7px;border-radius:6px;}
+.fmode p{margin:6px 0 0;color:var(--ink-soft);font-size:12.5px;line-height:1.55;}
+
+/* ===== sections ===== */
+main{padding-bottom:90px;}
+section{padding:46px 0 8px;scroll-margin-top:24px;border-top:1px solid var(--rule-soft);}
+section:first-of-type{border-top:none;}
+.sec-kick{
+  font-family:"Fraunces",serif;font-style:italic;font-size:13px;
+  color:var(--rust);letter-spacing:.05em;
+}
+section h2{
+  font-family:"Noto Serif SC",serif;font-weight:900;
+  font-size:clamp(23px,3vw,31px);line-height:1.22;margin:6px 0 4px;
+  letter-spacing:-.005em;
+  display:flex;align-items:baseline;gap:14px;
+}
+section h2 .idx{
+  font-family:"JetBrains Mono",monospace;font-weight:500;font-size:15px;
+  color:var(--accent);flex:none;
+}
+.lede{font-size:16px;color:var(--ink-soft);margin:10px 0 24px;max-width:70ch;}
+
+h3{
+  font-family:"Noto Serif SC",serif;font-weight:700;font-size:18.5px;
+  margin:30px 0 8px;color:var(--accent-2);
+  padding-left:13px;border-left:3px solid var(--accent);
+}
+h4{font-family:"Noto Sans SC",sans-serif;font-weight:700;font-size:15.5px;margin:20px 0 6px;color:var(--ink);}
+p{margin:10px 0;}
+strong{font-weight:700;color:var(--ink);}
+em{font-style:normal;background:linear-gradient(transparent 62%, rgba(156,66,33,.16) 62%);padding:0 1px;font-weight:500;}
+a.ref{color:var(--accent);text-decoration:none;border-bottom:1px solid var(--rule);}
+
+/* inline code & symbols */
+code,.sym{
+  font-family:"JetBrains Mono",monospace;font-size:.88em;
+  background:rgba(28,78,107,.07);color:var(--accent-2);
+  padding:1px 6px;border-radius:5px;
+}
+
+/* chips */
+.chip{
+  display:inline-block;font-family:"JetBrains Mono",monospace;font-size:10.5px;
+  font-weight:700;letter-spacing:.04em;padding:2px 8px;border-radius:6px;
+  vertical-align:middle;line-height:1.6;
+}
+.chip-fact{background:var(--fact-bg);color:var(--fact-ink);border:1px solid var(--fact-line);}
+.chip-inf{background:var(--inf-bg);color:var(--inf-ink);border:1px solid var(--inf-line);}
+
+/* lists */
+ul.clean{list-style:none;margin:12px 0;padding:0;}
+ul.clean>li{
+  position:relative;padding:7px 0 7px 26px;border-bottom:1px solid var(--rule-soft);
+}
+ul.clean>li:last-child{border-bottom:none;}
+ul.clean>li::before{
+  content:"";position:absolute;left:4px;top:16px;width:7px;height:7px;
+  border-radius:2px;background:var(--accent);transform:rotate(45deg);
+}
+ul.dash{list-style:none;margin:8px 0;padding:0;}
+ul.dash>li{position:relative;padding:4px 0 4px 20px;}
+ul.dash>li::before{content:"–";position:absolute;left:2px;color:var(--rust);font-weight:700;}
+
+/* cards */
+.card{
+  border:1px solid var(--rule);border-radius:14px;background:var(--paper-2);
+  padding:20px 22px;margin:18px 0;box-shadow:var(--shadow);
+}
+.card .ch{
+  font-family:"Noto Serif SC",serif;font-weight:700;font-size:16px;
+  margin:0 0 8px;color:var(--accent-2);display:flex;align-items:center;gap:9px;
+}
+.card .ch .step{
+  font-family:"JetBrains Mono",monospace;font-size:11px;color:#fff;
+  background:var(--accent);border-radius:6px;padding:2px 8px;flex:none;
+}
+
+/* equation block */
+.eq{
+  margin:16px 0;padding:14px 18px;overflow-x:auto;
+  border-radius:12px;border:1px solid var(--rule);
+  background:#fff;
+  border-left:3px solid var(--accent);
+}
+.eq .cap{
+  font-size:12px;color:var(--ink-faint);margin-top:8px;
+  font-family:"Noto Sans SC",sans-serif;line-height:1.55;
+}
+mjx-container{overflow-x:auto;overflow-y:hidden;max-width:100%;}
+
+/* fact / inference boxes */
+.box{
+  border-radius:14px;padding:18px 22px 18px 22px;margin:18px 0;
+  position:relative;border:1px solid;
+}
+.box .bh{
+  font-family:"Noto Serif SC",serif;font-weight:700;font-size:15px;
+  display:flex;align-items:center;gap:9px;margin-bottom:6px;
+}
+.box .ic{font-family:"JetBrains Mono",monospace;font-weight:700;
+  width:22px;height:22px;border-radius:6px;display:inline-flex;
+  align-items:center;justify-content:center;font-size:13px;flex:none;}
+.box-fact{background:var(--fact-bg);border-color:var(--fact-line);}
+.box-fact .bh{color:var(--fact-ink);}
+.box-fact .ic{background:var(--fact);color:#fff;}
+.box-inf{background:var(--inf-bg);border-color:var(--inf-line);}
+.box-inf .bh{color:var(--inf-ink);}
+.box-inf .ic{background:var(--inf);color:#fff;}
+.box p{margin:6px 0;font-size:14.5px;}
+.box ul.dash>li{font-size:14.5px;}
+.box ul.dash>li::before{color:inherit;opacity:.7;}
+
+.duo{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:18px 0;}
+
+/* tables */
+.tbl-wrap{overflow-x:auto;margin:16px 0;border-radius:12px;border:1px solid var(--rule);}
+table{border-collapse:collapse;width:100%;font-size:14px;background:var(--paper-2);}
+th,td{padding:10px 14px;text-align:left;border-bottom:1px solid var(--rule-soft);vertical-align:top;}
+thead th{
+  background:var(--accent);color:#fff;font-family:"Noto Sans SC";font-weight:500;
+  font-size:13px;letter-spacing:.02em;border-bottom:none;
+}
+tbody tr:last-child td{border-bottom:none;}
+tbody tr:nth-child(even){background:rgba(28,78,107,.025);}
+td .sym{background:rgba(28,78,107,.07);}
+.glo td:first-child{white-space:nowrap;font-family:"JetBrains Mono",monospace;}
+
+/* io grid for training */
+.io{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:16px 0;}
+.io .col{border:1px solid var(--rule);border-radius:12px;padding:16px 18px;background:#fff;}
+.io .col.out{background:var(--accent-wash);border-color:var(--fact-line);}
+.io .col .lbl{
+  font-family:"JetBrains Mono",monospace;font-size:11px;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--rust);margin-bottom:8px;
+}
+.io .col.out .lbl{color:var(--accent-2);}
+
+/* callout small */
+.tip{
+  border-left:3px solid var(--rust);background:#FBF2EC;
+  padding:12px 16px;border-radius:0 10px 10px 0;margin:16px 0;font-size:14px;
+  color:var(--ink-soft);
+}
+.tip b{color:var(--rust);}
+
+/* footer */
+footer{
+  border-top:1px solid var(--rule);margin-top:40px;padding:26px 0 60px;
+  color:var(--ink-faint);font-size:13px;
+}
+footer .src{font-family:"JetBrains Mono",monospace;font-size:11.5px;color:var(--ink-soft);}
+
+/* to top */
+#totop{
+  position:fixed;right:22px;bottom:22px;z-index:120;
+  width:42px;height:42px;border-radius:50%;border:1px solid var(--rule);
+  background:var(--paper-2);color:var(--accent);cursor:pointer;
+  box-shadow:var(--shadow);font-size:18px;display:none;
+}
+
+@media (max-width:980px){
+  .wrap{grid-template-columns:1fr;gap:0;}
+  .toc-col{display:none;}
+  .duo,.io{grid-template-columns:1fr;}
+}
+</style>
+</head>
+<body>
+<div id="progress"></div>
+
+<div class="wrap">
+
+  <!-- ============ TOC ============ -->
+  <aside class="toc-col">
+    <nav class="toc">
+      <span class="toc-kick">Pipeline Map</span>
+      <ol>
+        <li><a href="#overview">核心定位与贡献类别</a></li>
+        <li><a href="#collect">数据采集</a></li>
+        <li><a href="#process">数据处理</a></li>
+        <li><a href="#arch">模型结构（共享基础）</a></li>
+        <li><a href="#train">策略训练</a></li>
+        <li><a href="#infer">部署推理与控制</a></li>
+        <li><a href="#glossary">符号速查</a></li>
+        <li><a href="#summary">事实 / 推断 总览</a></li>
+      </ol>
+      <div class="legend">
+        <div class="lg"><span class="dot" style="background:var(--fact)"></span>论文证实的事实</div>
+        <div class="lg"><span class="dot" style="background:var(--inf)"></span>推断 / 未明确工程细节</div>
+      </div>
+    </nav>
+  </aside>
+
+  <!-- ============ CONTENT ============ -->
+  <div>
+
+  <!-- HERO -->
+  <header class="hero" id="top">
+    <p class="eyebrow">Unified Video-Action Joint Denoising · 全流程逐层解析</p>
+    <h1><span class="wm">Donk</span> 的完整流水线<br>数据 → 处理 → 训练 → 推理</h1>
+    <p class="sub">严格区分"论文明确陈述的事实"与"论文未写、需从工程常识推断的细节"，覆盖从数据采集（细到组成成分）、数据处理、策略训练（各阶段输入输出 / 数据来源 / 损失）到部署推理（输入输出 / 控制如何发生）的每一环。</p>
+    <div class="meta">
+      <span class="pill">基座 · <b>Wan2.2 TI2V-5B</b></span>
+      <span class="pill">范式 · <b>Flow Matching 联合去噪</b></span>
+      <span class="pill">动作 · <b>双手 MANO</b></span>
+      <span class="pill">数据 · <b>VITRA-1M</b></span>
+      <span class="pill">算力 · <b>64×Hopper 96GB</b></span>
+      <span class="pill">arXiv · <b>2606.03868</b></span>
+    </div>
+  </header>
+
+  <!-- PIPELINE STRIP -->
+  <div class="flow">
+    <div class="flow-title">一个去噪器，两种角色 —— 全链路概览</div>
+    <div class="flow-row">
+      <div class="fstep"><div class="n">STAGE 01</div><div class="t">数据采集</div><div class="d">不采新数据，仅用 VITRA-1M 的人类活动视频</div></div>
+      <div class="farrow">→</div>
+      <div class="fstep"><div class="n">STAGE 02</div><div class="t">数据处理</div><div class="d">VAE 编码 · MANO 归一化 · 锚点图渲染 · 0.30 丢图</div></div>
+      <div class="farrow">→</div>
+      <div class="fstep"><div class="n">STAGE 03</div><div class="t">联合去噪训练</div><div class="d">视频 token + 动作 token 同步去噪，四项损失</div></div>
+      <div class="farrow">→</div>
+      <div class="fstep"><div class="n">STAGE 04</div><div class="t">推理部署</div><div class="d">同一去噪核，按有无图像切换两种模式</div></div>
+    </div>
+    <div class="fbranch">
+      <div class="fmode ti">
+        <div class="mh">TI2VA <code>策略模式</code></div>
+        <p>输入 文本 + 首帧图像 + 初始手-相机锚点 → 预测未来视频与双手动作。作动作策略。</p>
+      </div>
+      <div class="fmode t2">
+        <div class="mh">T2VA <code>数据引擎模式</code></div>
+        <p>仅输入文本 → 自行实例化锚点 → 生成成对的交互视频 + 同步 MANO 动作。作数据引擎。</p>
+      </div>
+    </div>
+  </div>
+
+  <main>
+
+  <!-- ===================== 0. OVERVIEW ===================== -->
+  <section id="overview">
+    <span class="sec-kick">What it is</span>
+    <h2><span class="idx">00</span>核心定位与贡献类别</h2>
+    <p class="lede">一句话：<strong>同一个视频-动作联合去噪器，给观测图像它就是灵巧手动作策略，不给图它就是数据引擎</strong>——靠训练时以 <em>0.30 概率随机丢掉首帧图像条件</em>，把这两种模式压进同一套主干、同一套 flow-matching 目标里（在 Wan2.2 TI2V-5B 上联合去噪视频 token + 双手 MANO 动作 token）。</p>
+
+    <h3>用来干什么</h3>
+    <ul class="clean">
+      <li><strong>① 作动作策略（TI2VA）：</strong>从图像 + 语言预测未来双手 MANO 轨迹。</li>
+      <li><strong>② 作"数据引擎"（T2VA）：</strong>仅凭文本生成成对的"交互视频 + 同步手部动作"，把廉价的人类视频先验转成动作对齐的机器人训练数据——因为真实遥操作数据又贵又稀缺。</li>
+    </ul>
+
+    <h3>贡献属于什么类别（具体，非泛泛）</h3>
+    <div class="duo">
+      <div class="box box-fact">
+        <div class="bh"><span class="ic">✓</span>主要贡献</div>
+        <p><strong>问题形式化 + 训练策略。</strong>首次把 T2VA（文本→成对视频+动作）当作灵巧操作的<em>纯文本数据引擎</em>，并用"随机丢图"这一训练技巧把策略模式和数据引擎模式统一进一个模型、一套损失。</p>
+      </div>
+      <div class="box box-inf">
+        <div class="bh"><span class="ic">~</span>次要 / 明确不是</div>
+        <p><strong>次要是轻量架构适配</strong>（视频保持型注意力掩码、零初始化门控锚点注入、轻量动作头），都是挂在冻结 Wan 上的适配器，<strong>不是全新架构</strong>；数据用现成 VITRA-1M，<strong>不是数据集贡献</strong>。</p>
+      </div>
+    </div>
+
+    <div class="tip"><b>阅读约定：</b>本文每一处都标注来源。绿色 <span class="chip chip-fact">事实</span> = 论文明确写出；琥珀色 <span class="chip chip-inf">推断</span> = 论文未给、需从工程常识推断或属未涉及范围。每节末尾附"事实 / 推断"对照盒。</div>
+  </section>
+
+  <!-- ===================== 1. DATA COLLECTION ===================== -->
+  <section id="collect">
+    <span class="sec-kick">Stage 01 · Data Collection</span>
+    <h2><span class="idx">01</span>数据采集</h2>
+    <p class="lede">Donk <strong>本身不采集新数据</strong>。训练唯一使用 <span class="sym">VITRA-1M</span> 数据集（引文 <a class="ref">[33]</a>，Qixiu Li 等，arXiv:2510.21571）。因此 Donk 的训练样本本质是<strong>第一人称 / 以人手为中心的人类操作视频</strong>，而非遥操作采集的机器人数据。</p>
+
+    <h3>1.1 动机：为什么用人类视频替代机器人数据</h3>
+    <p>论文反复强调这一逻辑：灵巧操作的"成对机器人视觉-动作轨迹"因<strong>遥操作、标定、精细动作标注困难</strong>而昂贵稀缺；而"大规模人-物交互视频 + 文本条件视频先验"<strong>廉价丰富</strong>。<span class="chip chip-fact">事实</span></p>
+
+    <h3>1.2 VITRA-1M 的原始素材 vs 产出（关键澄清）</h3>
+    <p>需要分清两层。<strong>VITRA 自带双手 MANO 轨迹与左右手语言指令是事实，而非推断</strong>——这正是 VITRA 那篇工作的核心产物。</p>
+    <div class="card">
+      <div class="ch"><span class="step">原始素材</span>无脚本、无标注的第一人称视频</div>
+      <p>Ego4D、Epic-Kitchens、EgoExo4D、Something-Something V2 等原片，长度与任务粒度不一，含无关 / 噪声动作，<strong>缺语言指令与 3D 动作标签</strong>。即原片什么标注都没有。</p>
+    </div>
+    <div class="card">
+      <div class="ch"><span class="step">VITRA 产出</span>全自动人类活动分析流水线的结果</div>
+      <p>把原片转成与机器人 VLA 数据对齐的格式：生成<strong>原子级手部活动片段及其语言描述</strong>，每段附<strong>逐帧 3D 手部运动（MANO 表示）与相机运动</strong>，最终得到约 <strong>100 万 episode、2600 万帧</strong>的 hand-VLA 训练数据集。</p>
+      <ul class="dash">
+        <li><strong>语言指令：</strong>自带，且就是<em>分左右手</em>的子指令（"Left hand: … / Right hand: …"），与论文图 2 完全一致——<strong>分手指令直接来自 VITRA，不是 Donk 自己拆的</strong>。</li>
+        <li><strong>手部动作：</strong>自带逐帧 3D 手部运动，采用 MANO 表示（VITRA 数据卡片明确致谢 MANO 贡献者）。</li>
+        <li><strong>相机运动：</strong>自带（即 Donk 用到的相机内参 <span class="sym">K</span> 与首帧手部状态 <span class="sym">s₀</span> 的来源）。</li>
+      </ul>
+    </div>
+    <p><strong>Donk 在此基础上仅做：</strong>对 MANO 轨迹<em>归一化</em>、对无效/缺失手<em>掩码</em>、渲染 anchor 图。底层"双手 MANO 轨迹 + 左右手语言"都是 VITRA 现成提供——这也呼应了"Donk 不是数据集贡献"的定性。</p>
+
+    <h3>1.3 每条样本的组成成分（Donk 形式化中）</h3>
+    <div class="tbl-wrap">
+    <table>
+      <thead><tr><th style="width:30%">成分</th><th>含义 / 取值</th><th style="width:14%">来源</th></tr></thead>
+      <tbody>
+        <tr><td>操作视频 <span class="sym">V₀:T</span></td><td>固定时域 <span class="sym">T</span> 的人-物交互视频片段</td><td><span class="chip chip-fact">事实</span></td></tr>
+        <tr><td>未来手部动作 <span class="sym">A₁:T</span></td><td>对齐的<strong>双手 MANO 参数序列</strong>（腕部位姿 + 手指 MANO 参数）</td><td><span class="chip chip-fact">事实</span></td></tr>
+        <tr><td>语言指令 <span class="sym">c</span></td><td><strong>分左右手</strong>子指令（单手任务时另一只手为 None）</td><td><span class="chip chip-fact">事实</span></td></tr>
+        <tr><td>相机内参 <span class="sym">K</span> + 首帧状态 <span class="sym">s₀</span></td><td>合成初始手-相机锚点 <span class="sym">g₀=(s₀,K)</span></td><td><span class="chip chip-fact">事实</span></td></tr>
+        <tr><td>无效手掩码</td><td>训练时缺失 / 无效的手被掩码</td><td><span class="chip chip-fact">事实</span></td></tr>
+        <tr><td>"1M"规模细节</td><td>确切片段时长、场景分布、左右手标注比例在 [33] 中，本文未复述</td><td><span class="chip chip-inf">推断</span></td></tr>
+        <tr><td>MANO 维度</td><td>论文只说"归一化连续双手 MANO 轨迹"，未给确切维数</td><td><span class="chip chip-inf">推断</span></td></tr>
+      </tbody>
+    </table>
+    </div>
+
+    <h3>1.4 评测用数据集（与训练分离）</h3>
+    <ul class="clean">
+      <li><strong>OakInk2 <a class="ref">[52]</a>：</strong>第一人称双手-物体操作基准，用于动作精度（TI2VA）。</li>
+      <li><strong>EgoDex <a class="ref">[36]</a>：</strong>经 LOME 协议 <a class="ref">[53]</a> 用于视频质量（TI2VA）；T2VA 的 VLM 评分也取 EgoDex 100 条样本。</li>
+    </ul>
+
+    <div class="duo">
+      <div class="box box-fact">
+        <div class="bh"><span class="ic">✓</span>本节事实</div>
+        <ul class="dash">
+          <li>训练只用 VITRA-1M；人类第一人称视频，非机器人遥操作数据。</li>
+          <li>双手 MANO 轨迹、左右手语言、相机运动均由 VITRA 自带。</li>
+          <li>样本含 <span class="sym">V₀:T, A₁:T, c, K, s₀</span> 与无效手掩码。</li>
+          <li>评测集 OakInk2 / EgoDex 与训练分离。</li>
+        </ul>
+      </div>
+      <div class="box box-inf">
+        <div class="bh"><span class="ic">~</span>本节推断 / 未明确</div>
+        <ul class="dash">
+          <li>VITRA 的确切规模、片段时长、场景与左右手标注比例（在 [33]）。</li>
+          <li>MANO 动作确切维度（单手常见 全局旋转 3 + 关节 45 ≈ 百维量级，仅为合理推断）。</li>
+          <li>训练时域 <span class="sym">T</span> / 帧数（17 帧、832×480 是 EgoDex 评测设定，不一定等于训练片长）。</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== 2. DATA PROCESSING ===================== -->
+  <section id="process">
+    <span class="sec-kick">Stage 02 · Data Processing</span>
+    <h2><span class="idx">02</span>数据处理</h2>
+    <p class="lede">从"原始样本"到"可喂入去噪器的训练张量"，共五个动作。其中<strong>图像条件注入 + 0.30 丢图</strong>是 Donk 能"一个模型两用"的工程根因。</p>
+
+    <h3>2.1 视频编码</h3>
+    <p>视频进入预训练 Wan VAE 潜空间。<span class="chip chip-fact">事实</span></p>
+    <div class="eq">$$x_\varepsilon = \mathcal{E}(V_{0:T})$$</div>
+
+    <h3>2.2 动作表示</h3>
+    <p>动作表示为<strong>归一化连续双手 MANO 轨迹</strong>；无效手维度在训练中掩码。<span class="chip chip-fact">事实</span></p>
+    <div class="eq">$$a_\varepsilon = A_{1:T}$$</div>
+
+    <h3>2.3 锚点图渲染（首帧几何脚手架）</h3>
+    <p>由 <span class="sym">g₀=(s₀,K)</span> 渲染一张<strong>彩色编码的 MANO 骨架图</strong> <span class="sym">M₀=R(g₀)</span>，再用冻结 Wan VAE 编码成潜表示 <span class="sym">m₀=E(M₀)</span>。这张图给首帧提供"手在像平面的位置与姿态"的几何脚手架。<span class="chip chip-fact">事实</span></p>
+    <div class="eq">$$M_0 = R(g_0), \qquad m_0 = \mathcal{E}(M_0)$$
+    <div class="cap">边界：<span class="sym">g₀</span> 只是<strong>初始条件</strong>，不是未来轨迹——它告诉模型"开局手在哪儿、什么姿态"，后续手-物演化由联合去噪器自己学。</div></div>
+
+    <h3>2.4 图像条件注入（关键统一技巧）</h3>
+    <ul class="clean">
+      <li>当提供观测图像（<span class="sym">I<sub>ε</sub>=I₀</span>）时：把 VAE 编码后的<strong>首帧图像直接替换第一帧视频潜变量</strong>，并赋予时间步（timestep）<strong>0</strong>。</li>
+      <li>当无图像（<span class="sym">I<sub>ε</sub>=∅</span>）时：<strong>跳过这一替换</strong>。</li>
+    </ul>
+    <p><span class="chip chip-fact">事实</span> 注意区分：图像注入钳的是第一帧<em>视频</em>潜变量；anchor 注入（见 §4 架构）加的是第一帧的<em>几何提示</em>——二者是两条独立的首帧条件通路。</p>
+
+    <h3>2.5 条件随机丢弃</h3>
+    <p>训练时以 <strong>0.30 的概率丢弃 <span class="sym">I₀</span></strong>，于是"有图（TI2VA）"和"无图（T2VA）"两种模式<strong>共享同一套主干、token 布局和目标函数</strong>。<span class="chip chip-fact">事实</span></p>
+
+    <div class="duo">
+      <div class="box box-fact">
+        <div class="bh"><span class="ic">✓</span>本节事实</div>
+        <ul class="dash">
+          <li><span class="sym">x_ε=E(V₀:T)</span>，Wan VAE 潜空间编码。</li>
+          <li><span class="sym">a_ε=A₁:T</span>，归一化双手 MANO，无效手维度掩码。</li>
+          <li>锚点图 <span class="sym">M₀=R(g₀)</span> 为彩色编码 MANO 骨架图，冻结 Wan VAE 编码为 <span class="sym">m₀</span>。</li>
+          <li>有图替换首帧潜变量 + timestep 0；无图跳过；训练 0.30 概率丢图统一两模式。</li>
+        </ul>
+      </div>
+      <div class="box box-inf">
+        <div class="bh"><span class="ic">~</span>本节推断 / 未明确</div>
+        <ul class="dash">
+          <li>锚点骨架图的具体配色 / 通道约定、MANO 渲染器实现细节。</li>
+          <li>动作归一化的具体方案（按数据集统计的均值方差？坐标系？绝对 vs 相对）——只说"归一化"。</li>
+          <li>逐帧手区如何得到（合理推断来自 MANO 渲染）。</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== 3. ARCHITECTURE ===================== -->
+  <section id="arch">
+    <span class="sec-kick">Shared Backbone</span>
+    <h2><span class="idx">03</span>模型结构（训练 / 推理共享基础）</h2>
+    <p class="lede">训练的输入输出与损失，必须放在这套结构上才能讲清。Donk 的结构是"挂在冻结 Wan 上的轻量适配"，而非全新网络。</p>
+
+    <h3>3.1 去噪器基座</h3>
+    <p>从 <strong>Wan2.2 TI2V-5B</strong> <a class="ref">[12]</a> 初始化，是一个视频扩散 Transformer（DiT <a class="ref">[13]</a>），在 <strong>flow-matching</strong> 范式 <a class="ref">[14]</a> 下联合去噪视频 token 与动作 token。<span class="chip chip-fact">事实</span></p>
+
+    <h3>3.2 Token 拼接与新增模块</h3>
+    <div class="eq">$$z = [\,z_{\text{video}},\ z_{\text{action}},\ z_{\text{anchor}}\,]$$</div>
+    <p>Wan 原生视频头预测视频输出；新增一个<strong>轻量动作头</strong>预测 MANO 动作；另加<strong>轻量动作编码器、状态编码器、anchor 编码器</strong>。<span class="chip chip-fact">事实</span></p>
+
+    <h3>3.3 视频保持型联合注意力（Video-Preserving Joint Attention）</h3>
+    <p><strong>非对称掩码：</strong>视频 query <em>只能看视频 token</em>；动作 / anchor query <em>能看全序列</em>。这样视觉流计算尽量贴近预训练 Wan（不被新引入的动作/anchor token 扰动），同时动作 token 能"读"到正在生成的视觉 rollout 与初始手-相机锚点，实现手部运动与视频对齐而不牺牲视觉先验稳定性。<span class="chip chip-fact">事实</span></p>
+
+    <h3>3.4 Anchor-Map 控制器（五步）</h3>
+    <div class="card">
+      <div class="ch"><span class="step">步骤 1</span>共享控制表征</div>
+      <p>把 <span class="sym">m₀</span> patch 化后送入轻量适配器 <span class="sym">G_anc</span>，得到共享 anchor 控制表征 <span class="sym">C</span>。</p>
+    </div>
+    <div class="card">
+      <div class="ch"><span class="step">步骤 2</span>分层提示</div>
+      <p>对每个被选中的 Wan 层 <span class="sym">ℓ∈S</span>，用该层专属 MLP 生成与首帧视频 token 同维的 anchor 提示 <span class="sym">H_ℓ</span>。</p>
+      <div class="eq">$$C = G_{\text{anc}}\!\big(\text{Patch}(m_0)\big), \qquad H_\ell = \text{MLP}_\ell(C), \quad \ell \in S$$</div>
+    </div>
+    <div class="card">
+      <div class="ch"><span class="step">步骤 3</span>门控首帧注入</div>
+      <div class="eq">$$z^{\text{video}}_{\ell,0} \;\leftarrow\; z^{\text{video}}_{\ell,0} + \gamma_\ell\, H_\ell$$
+      <div class="cap">仅注入第一帧（t = 0）；<span class="sym">t&gt;0</span> 的视频 token 保持不变——只改第一帧。</div></div>
+    </div>
+    <div class="card">
+      <div class="ch"><span class="step">步骤 4</span>门初始化为 0</div>
+      <p><span class="sym">γ_ℓ</span> 初始为 0，所以训练<strong>从纯 Wan 行为起步</strong>，anchor 的影响随训练逐步学出来，不会一上来就扰乱预训练先验。</p>
+    </div>
+    <div class="card">
+      <div class="ch"><span class="step">步骤 5</span>T2VA 的初始化器</div>
+      <p>无图时没有真实 <span class="sym">s₀</span>，于是单独训一个轻量"文本条件初始化器"，学习首帧手-相机状态的经验分布以实例化 <span class="sym">g̃₀</span>；它<strong>只用于渲染 anchor 图</strong>，不参与未来视频/动作生成。</p>
+    </div>
+    <div class="tip"><b>一点关系澄清：</b>首帧手部状态 <span class="sym">s₀</span> 有<strong>两个去处</strong>——既用来渲染 anchor 图，又被图 2 中独立的 <strong>State Encoder</strong>（消融表里的 "State" / state expert）编码成状态 token 作为条件。所以消融里 "State" 开关指的是这条状态编码通路，与 anchor 控制器相关但不是同一个东西。</div>
+
+    <div class="duo">
+      <div class="box box-fact">
+        <div class="bh"><span class="ic">✓</span>本节事实</div>
+        <ul class="dash">
+          <li>基于 Wan2.2 TI2V-5B；DiT；flow-matching 联合去噪视频 + MANO 动作。</li>
+          <li><span class="sym">z=[z_video, z_action, z_anchor]</span>；原生视频头 + 轻量动作头。</li>
+          <li>视频保持型非对称注意力掩码。</li>
+          <li>零初始化门控的首帧 anchor 注入，只作用于第一帧。</li>
+        </ul>
+      </div>
+      <div class="box box-inf">
+        <div class="bh"><span class="ic">~</span>本节推断 / 未明确</div>
+        <ul class="dash">
+          <li>动作 / 状态 / anchor 编码器与动作头、anchor 适配器的具体维度、层数（只说"轻量"，无数字）。</li>
+          <li>被注入 anchor 的 Wan 层集合 <span class="sym">S</span>，以及训练时"解冻的一小部分 Wan 层"具体是哪些、有多少。</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== 4. TRAINING ===================== -->
+  <section id="train">
+    <span class="sec-kick">Stage 03 · Policy Training</span>
+    <h2><span class="idx">04</span>策略训练</h2>
+    <p class="lede">单一训练配方，两种条件模式共用（靠 §2.5 的 0.30 丢图）。下面给出训练时的输入输出、四项损失、可训练范围与优化超参。</p>
+
+    <h3>4.1 训练时的输入与输出</h3>
+    <div class="io">
+      <div class="col">
+        <div class="lbl">Inputs · 输入</div>
+        <ul class="dash">
+          <li>加噪的视频潜变量</li>
+          <li>加噪的动作 token</li>
+          <li>anchor token</li>
+          <li>文本嵌入</li>
+          <li>（有图时）干净的首帧图像潜变量</li>
+          <li>初始手部状态 <span class="sym">s₀</span></li>
+        </ul>
+      </div>
+      <div class="col out">
+        <div class="lbl">Outputs · 预测目标</div>
+        <ul class="dash">
+          <li>视频速度 <span class="sym">v̂_x</span></li>
+          <li>动作速度 <span class="sym">v̂_a</span></li>
+        </ul>
+        <p style="margin-top:8px;font-size:13px;color:var(--ink-soft)">分别用 flow-matching 目标 <span class="sym">v_x, v_a</span> 监督。</p>
+      </div>
+    </div>
+
+    <h3>4.2 损失函数（四项 · 论文事实）</h3>
+
+    <h4>① 视频流匹配 + ② 掩码动作流匹配</h4>
+    <div class="eq">$$\mathcal{L}_{\text{video}} = \lVert \hat v_x - v_x \rVert_2^2, \qquad \mathcal{L}_{\text{action}} = \frac{\lVert M_a \odot (\hat v_a - v_a) \rVert_2^2}{\max\!\big(\textstyle\sum M_a,\ 1\big)}$$
+    <div class="cap"><span class="sym">M_a</span> 屏蔽无效手维度；分母 <span class="sym">max(∑M_a, 1)</span> 做归一化以防全掩码时除零。</div></div>
+
+    <h4>③ 注视 / 手部聚焦视频损失 <span class="sym">L_gaze</span></h4>
+    <p>一个<strong>手部聚焦的视频损失</strong>，做法是对<strong>渲染手部区域附近的视频流误差加权</strong>，强调手-物交互区。可理解为：在标准视频误差 <span class="sym">‖v̂_x−v_x‖</span> 上，按"是否靠近手区"做空间重加权，手区权重更高。<span class="chip chip-fact">事实（概念）</span></p>
+    <div class="tip"><b>命名易误导：</b>名字 "GAZE / gaze" 容易让人以为是注视/眼动，但论文描述的是<strong>手部区域加权</strong>，不是真的视线追踪。</div>
+
+    <h4>④ 教师先验 <span class="sym">L_prior</span></h4>
+    <p>用一个<strong>冻结的 Wan 教师模型</strong>，喂给它<strong>相同的视频潜变量与文本条件</strong>，让它预测视频速度 <span class="sym">v̂_x<sup>tea</sup></span>；约束学生视频速度向教师靠拢，<strong>稳定视觉生成路径</strong>（防止新加的动作/anchor token 拉低画质）。<span class="chip chip-fact">事实</span></p>
+    <div class="eq">$$\mathcal{L}_{\text{prior}} = \lVert \hat v_x - \hat v_x^{\,\text{tea}} \rVert_2^2$$</div>
+    <div class="tip"><b>关键细节：</b><span class="sym">L_prior</span> <strong>只在保留图像条件时启用</strong>。因为图像是通过钳制第一帧潜变量注入的，教师在"有图"时是被图像 grounding 的；若在纯文本分支也启用，等于逼一个没有图像的分支去模仿一个用了图像的教师——不合理，故只在有图时加。</div>
+
+    <h4>总目标</h4>
+    <div class="eq">$$\mathcal{L}_{\text{Donk}} = \lambda_v\big(\mathcal{L}_{\text{video}} + \lambda_g\,\mathcal{L}_{\text{gaze}}\big) + \lambda_a\,\mathcal{L}_{\text{action}} + \lambda_p\,\mathcal{L}_{\text{prior}}$$
+    <div class="cap">注意 <span class="sym">L_gaze</span> 被 <span class="sym">λ_v·λ_g</span> 共同加权。动作与 anchor 接口（含 anchor-map 适配器）端到端随此目标训练。</div></div>
+
+    <h3>4.3 可训练 vs 冻结</h3>
+    <div class="io">
+      <div class="col">
+        <div class="lbl">Frozen · 冻结</div>
+        <ul class="dash">
+          <li>文本编码器</li>
+          <li>VAE</li>
+          <li>教师模型</li>
+          <li>绝大多数 Wan 块</li>
+        </ul>
+      </div>
+      <div class="col out">
+        <div class="lbl">Trained · 训练</div>
+        <ul class="dash">
+          <li>动作 / anchor 接口</li>
+          <li>anchor-map 适配器</li>
+          <li>动作头</li>
+          <li>一小部分 Wan 层</li>
+        </ul>
+      </div>
+    </div>
+    <p><strong>T2VA 的额外组件：</strong>单独训练一个轻量"文本条件初始化器"，学习首帧手-相机状态的经验分布以实例化 <span class="sym">g̃₀</span>；它只用于渲染初始 anchor 图，不参与未来视频/动作生成。<span class="chip chip-fact">事实</span></p>
+
+    <h3>4.4 优化配置（论文事实）</h3>
+    <div class="tbl-wrap">
+    <table>
+      <thead><tr><th style="width:34%">项</th><th>取值</th></tr></thead>
+      <tbody>
+        <tr><td>数据</td><td>VITRA-1M</td></tr>
+        <tr><td>硬件</td><td>64 × NVIDIA Hopper（96 GB）GPU</td></tr>
+        <tr><td>并行</td><td>PyTorch FSDP2；每卡 1 个 clip，有效 batch = 64 clips</td></tr>
+        <tr><td>精度</td><td>bfloat16</td></tr>
+        <tr><td>优化器</td><td>AdamW，恒定学习率 <span class="sym">2×10⁻⁵</span></td></tr>
+        <tr><td>动量 / 数值</td><td><span class="sym">(β₁,β₂)=(0.9, 0.999)</span>，<span class="sym">ε=10⁻⁸</span></td></tr>
+        <tr><td>正则</td><td>weight decay 0.01，梯度裁剪 1.0</td></tr>
+      </tbody>
+    </table>
+    </div>
+
+    <div class="duo">
+      <div class="box box-fact">
+        <div class="bh"><span class="ic">✓</span>本节事实</div>
+        <ul class="dash">
+          <li>输入/输出与四项损失的形式；<span class="sym">L_prior</span> 仅有图时启用。</li>
+          <li>冻结 / 解冻清单；T2VA 单独训文本条件初始化器。</li>
+          <li>全部优化超参（64×96GB、FSDP2、AdamW 2e-5 等）。</li>
+        </ul>
+      </div>
+      <div class="box box-inf">
+        <div class="bh"><span class="ic">~</span>本节推断 / 未明确</div>
+        <ul class="dash">
+          <li>四个损失权重 <span class="sym">λ_v, λ_g, λ_a, λ_p</span> 的具体数值。</li>
+          <li>去噪步数 / 噪声调度、训练总步数、warmup、是否用 EMA。</li>
+          <li><span class="sym">L_gaze</span> 中"手部区域"训练时如何逐帧得到掩码（推测来自 MANO 渲染）。</li>
+          <li>"state expert"的确切实现（独立专家网络，还是即 state/anchor 编码通路）未充分展开。</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== 5. INFERENCE ===================== -->
+  <section id="infer">
+    <span class="sec-kick">Stage 04 · Deployment & Inference</span>
+    <h2><span class="idx">05</span>部署推理与控制</h2>
+    <p class="lede">两种推理模式共用<strong>同一去噪核</strong>。重点是把"控制到底怎么发生"的边界讲清——这关系到能否把 Donk 当真机策略看待。</p>
+
+    <h3>5.1 TI2VA（策略模式）</h3>
+    <p>输入 <span class="sym">(c, I₀, g₀)</span>，其中 <span class="sym">g₀</span> 来自观测到的首帧手部状态与相机内参。用 <span class="sym">I₀</span> <strong>钳制（clamp）</strong>第一帧视频潜变量，然后去噪生成未来视频-动作轨迹。<span class="chip chip-fact">事实</span></p>
+    <div class="eq">$$p^{\text{policy}}_\omega\big(V_{1:T},\,A_{1:T} \,\big|\, c,\, I_0,\, g_0\big)$$</div>
+
+    <h3>5.2 T2VA（数据引擎模式）</h3>
+    <p>只输入文本 <span class="sym">c</span>。初始化器先实例化一个合理的 <span class="sym">g̃₀</span> 并渲染 anchor 图，再用同一去噪器生成成对的交互视频 <span class="sym">V₀:T</span> 与同步 MANO 动作 <span class="sym">A₁:T</span>。<span class="chip chip-fact">事实</span></p>
+    <div class="eq">$$p^{\text{engine}}_\omega\big(V_{0:T},\,A_{1:T} \,\big|\, c,\, \tilde g_0\big)$$</div>
+
+    <h3>5.3 推理时冻结</h3>
+    <p>文本编码器、VAE、教师、绝大多数 Wan 块。<span class="chip chip-fact">事实</span></p>
+
+    <h3>5.4 "控制"到底怎么发生（关键边界）</h3>
+    <p>Donk 的"动作"输出是<strong>双手 MANO 轨迹</strong>（腕部位姿 + 手指 MANO 参数）。所谓"作为策略"是指：给定当前观测图像与指令，模型<strong>一次性预测一段时域 <span class="sym">T</span> 的未来双手动作 chunk</strong>。</p>
+    <div class="box box-inf" style="margin-top:14px">
+      <div class="bh"><span class="ic">!</span>必须明确的范围限制</div>
+      <p><strong>论文对它的评测全部是离线开环</strong>——把预测 chunk 与真值轨迹比对（OakInk2 / EgoDex），<strong>没有任何闭环执行、没有真实机器人控制实验</strong>。<span class="chip chip-fact">这一点是事实</span></p>
+      <p style="margin-top:10px">因此以下属于<strong>推断 / 未涉及</strong>：</p>
+      <ul class="dash">
+        <li>如何把人手 MANO retarget 到具体机器人手（跨形态映射）——论文未做、未讨论。</li>
+        <li>闭环重规划频率、动作执行接口——未涉及。</li>
+        <li>T2VA"数据引擎"的下游闭环（生成数据 → 训下游策略 → 证明性能提升）在本文<strong>并未跑通</strong>；结论明说这只是"迈向把 WAM 直接当数据引擎的<em>初步路径（initial path）</em>"，其有效性仅以生成质量佐证，而非下游任务收益。</li>
+      </ul>
+    </div>
+
+    <div class="box box-fact">
+      <div class="bh"><span class="ic">✓</span>本节事实小结</div>
+      <ul class="dash">
+        <li>TI2VA：<span class="sym">(c, I₀, g₀)</span> → 用 <span class="sym">I₀</span> 钳第一帧潜变量 → 生成未来视频-动作。</li>
+        <li>T2VA：仅 <span class="sym">c</span> → 实例化 <span class="sym">g̃₀</span> + 渲染 anchor 图 → 同一去噪器生成成对视频-动作。</li>
+        <li>评测均为离线开环对真值，无闭环、无真机。</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ===================== 6. GLOSSARY ===================== -->
+  <section id="glossary">
+    <span class="sec-kick">Reference</span>
+    <h2><span class="idx">06</span>符号速查</h2>
+    <p class="lede">便于对照阅读。带"未给"标注者即论文未提供数值。</p>
+    <div class="tbl-wrap">
+    <table class="glo">
+      <thead><tr><th style="width:24%">符号</th><th>含义</th></tr></thead>
+      <tbody>
+        <tr><td>$c$</td><td>语言指令（分左右手子指令）</td></tr>
+        <tr><td>$V_{0:T}$</td><td>视频（$T$ 为固定时域）</td></tr>
+        <tr><td>$A_{1:T}$</td><td>未来手部动作轨迹（双手 MANO 序列）</td></tr>
+        <tr><td>$I_\varepsilon \in \{I_0, \varnothing\}$</td><td>视觉条件模式（$I_0$ 观测首帧图；$\varnothing$ 无图）</td></tr>
+        <tr><td>$g_0=(s_0,K)$</td><td>初始手-相机锚点（$s_0$ 首帧 MANO 手状态，$K$ 相机内参）</td></tr>
+        <tr><td>$\tilde g_0$</td><td>无图时由初始化器实例化的锚点</td></tr>
+        <tr><td>$x_\varepsilon=\mathcal{E}(V_{0:T})$</td><td>视频潜变量</td></tr>
+        <tr><td>$a_\varepsilon=A_{1:T}$</td><td>归一化双手 MANO 动作</td></tr>
+        <tr><td>$M_0=R(g_0)$</td><td>锚点骨架图（彩色编码 MANO）</td></tr>
+        <tr><td>$m_0=\mathcal{E}(M_0)$</td><td>锚点图的潜表示</td></tr>
+        <tr><td>$z=[z_{\text{video}},z_{\text{action}},z_{\text{anchor}}]$</td><td>拼接 token</td></tr>
+        <tr><td>$G_{\text{anc}}$</td><td>anchor 适配器</td></tr>
+        <tr><td>$C$</td><td>共享 anchor 控制表征</td></tr>
+        <tr><td>$H_\ell$</td><td>第 $\ell$ 层 anchor 提示</td></tr>
+        <tr><td>$S$</td><td>被注入的 Wan 层集合（具体未给）</td></tr>
+        <tr><td>$\gamma_\ell$</td><td>门（初始为 0）</td></tr>
+        <tr><td>$\hat v_x,\ \hat v_a$</td><td>预测的视频 / 动作速度</td></tr>
+        <tr><td>$v_x,\ v_a$</td><td>对应 flow-matching 目标</td></tr>
+        <tr><td>$M_a$</td><td>无效手维度掩码</td></tr>
+        <tr><td>$\hat v_x^{\,\text{tea}}$</td><td>教师视频速度</td></tr>
+        <tr><td>$\lambda_v,\lambda_g,\lambda_a,\lambda_p$</td><td>损失权重（数值未给）</td></tr>
+      </tbody>
+    </table>
+    </div>
+  </section>
+
+  <!-- ===================== 7. SUMMARY ===================== -->
+  <section id="summary">
+    <span class="sec-kick">At a glance</span>
+    <h2><span class="idx">07</span>事实 / 推断 总览</h2>
+    <p class="lede">把全流程的来源一次性对齐，便于核对。</p>
+    <div class="duo">
+      <div class="box box-fact">
+        <div class="bh"><span class="ic">✓</span>论文已证实的关键事实</div>
+        <ul class="dash">
+          <li>训练仅用 VITRA-1M；双手 MANO 轨迹 + 左右手语言 + 相机运动由 VITRA 自带。</li>
+          <li>基于 Wan2.2 TI2V-5B、flow-matching 联合去噪视频 + MANO 动作。</li>
+          <li>视频保持型非对称注意力；零初始化门控的首帧 anchor 注入。</li>
+          <li>有图替换首帧潜变量 + timestep 0；训练 0.30 丢图统一两模式。</li>
+          <li>四项损失的形式；<span class="sym">L_prior</span> 仅在有图时启用。</li>
+          <li>冻结 / 解冻清单；T2VA 单独训文本条件初始化器。</li>
+          <li>优化超参：64×96GB、FSDP2、AdamW 2e-5、bf16、wd 0.01、grad clip 1.0。</li>
+          <li>推理两模式定义；评测均为离线开环对真值。</li>
+        </ul>
+      </div>
+      <div class="box box-inf">
+        <div class="bh"><span class="ic">~</span>论文未明确、需推断的工程细节</div>
+        <ul class="dash">
+          <li>四个损失权重 <span class="sym">λ_v, λ_g, λ_a, λ_p</span> 的具体数值。</li>
+          <li>动作 / anchor 各模块的维度、层数。</li>
+          <li>解冻的 Wan 层与注入层集合 <span class="sym">S</span>。</li>
+          <li>MANO 动作维度与归一化方案。</li>
+          <li>训练时域 / 帧数与采样步数、调度、warmup、EMA。</li>
+          <li>gaze 手区掩码的逐帧生成方式（推测来自 MANO 渲染）。</li>
+          <li>MANO → 机器人手的 retarget（跨形态映射）。</li>
+          <li>闭环 / 真机部署；T2VA 合成数据用于下游训练的实证收益。</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <p class="src">Source · Dingrui Wang et&nbsp;al., "Unified Video-Action Joint Denoising for Dexterous Action and Data Generation", arXiv:2606.03868v1 (TU Munich · ByteDance · Tsinghua). 训练数据 VITRA-1M [33] arXiv:2510.21571.</p>
+    <p>本文严格区分论文明确陈述与工程推断；凡标注"推断 / 未明确"者，均为论文未提供、需从工程常识合理推测或属未涉及范围的内容。</p>
+  </footer>
+
+  </main>
+  </div>
+</div>
+
+<button id="totop" aria-label="回到顶部">↑</button>
+
+<script>
+(function(){
+  // progress bar
+  var bar=document.getElementById('progress');
+  var totop=document.getElementById('totop');
+  function onScroll(){
+    var h=document.documentElement;
+    var max=h.scrollHeight-h.clientHeight;
+    var p=max>0?h.scrollTop/max:0;
+    bar.style.transform='scaleX('+p+')';
+    totop.style.display=h.scrollTop>600?'block':'none';
+  }
+  window.addEventListener('scroll',onScroll,{passive:true});
+  onScroll();
+  totop.addEventListener('click',function(){window.scrollTo({top:0,behavior:'smooth'});});
+
+  // scroll-spy
+  var links=Array.prototype.slice.call(document.querySelectorAll('.toc a'));
+  var map={};
+  links.forEach(function(a){map[a.getAttribute('href').slice(1)]=a;});
+  var obs=new IntersectionObserver(function(entries){
+    entries.forEach(function(e){
+      if(e.isIntersecting){
+        links.forEach(function(l){l.classList.remove('active');});
+        var a=map[e.target.id];
+        if(a) a.classList.add('active');
+      }
+    });
+  },{rootMargin:'-18% 0px -72% 0px',threshold:0});
+  document.querySelectorAll('section[id]').forEach(function(s){obs.observe(s);});
+})();
+</script>
+</body>
+</html>

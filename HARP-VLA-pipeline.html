@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HARP-VLA · 完整流程拆解</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=Noto+Serif+SC:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+:root{
+  --bg:#f4f1e9;
+  --surface:#fbf9f3;
+  --surface-2:#f0ebdd;
+  --ink:#1d1a15;
+  --muted:#574f43;
+  --faint:#8c8472;
+  --line:#e2dbcb;
+  --line-strong:#d2c9b4;
+  --pine:#0e5a4f;
+  --pine-2:#0a463d;
+  --pine-soft:#e4efea;
+  --fact-ink:#1c6b3c;
+  --fact-bg:#eaf4ec;
+  --fact-line:#bfdcc6;
+  --infer-ink:#985611;
+  --infer-bg:#f8efdc;
+  --infer-line:#e7d4a9;
+  --flag-ink:#a23427;
+  --flag-bg:#f8e8e4;
+  --flag-line:#ecc8c0;
+  --serif:"Newsreader","Noto Serif SC",Georgia,"Songti SC",serif;
+  --display:"Fraunces","Noto Serif SC",Georgia,serif;
+  --mono:"JetBrains Mono","Noto Sans Mono",ui-monospace,monospace;
+}
+
+*{box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--ink);
+  font-family:var(--serif);
+  font-size:17px;
+  line-height:1.78;
+  font-weight:400;
+  -webkit-font-smoothing:antialiased;
+  background-image:radial-gradient(circle at 12% -5%, #fbf8f0 0%, transparent 45%),radial-gradient(circle at 92% 0%, #efe9da 0%, transparent 40%);
+  background-attachment:fixed;
+}
+
+/* ---------- layout ---------- */
+.wrap{max-width:1200px;margin:0 auto;padding:0 30px;}
+.layout{display:grid;grid-template-columns:236px minmax(0,1fr);gap:60px;align-items:start;padding-bottom:120px;}
+.content{max-width:768px;}
+
+/* ---------- hero ---------- */
+.hero{padding:96px 0 54px;position:relative;}
+.hero .eyebrow{
+  font-family:var(--mono);font-size:12px;letter-spacing:.32em;text-transform:uppercase;
+  color:var(--pine);font-weight:500;margin-bottom:26px;
+  display:flex;align-items:center;gap:14px;
+}
+.hero .eyebrow::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,var(--line-strong),transparent);max-width:300px;}
+.hero h1{
+  font-family:var(--display);font-weight:600;
+  font-size:clamp(38px,6vw,68px);line-height:1.02;letter-spacing:-.015em;
+  margin:0 0 8px;color:var(--ink);
+}
+.hero h1 .lo{display:block;font-size:.52em;font-weight:500;color:var(--pine-2);letter-spacing:0;margin-top:14px;font-family:var(--display);}
+.hero .sub{font-size:20px;color:var(--muted);max-width:640px;margin:26px 0 0;line-height:1.6;}
+.hero .meta{
+  margin-top:38px;display:flex;flex-wrap:wrap;gap:10px 22px;font-family:var(--mono);
+  font-size:12.5px;color:var(--faint);letter-spacing:.02em;
+}
+.hero .meta b{color:var(--muted);font-weight:500;}
+.hr-rule{height:2px;background:var(--ink);opacity:.85;margin:0 0 2px;}
+
+/* ---------- legend ---------- */
+.legend{
+  background:var(--surface);border:1px solid var(--line);border-radius:14px;
+  padding:24px 28px;margin:40px 0 8px;
+  box-shadow:0 1px 0 rgba(0,0,0,.02);
+}
+.legend h4{margin:0 0 14px;font-family:var(--mono);font-size:11.5px;letter-spacing:.22em;text-transform:uppercase;color:var(--faint);font-weight:500;}
+.legend .row{display:flex;align-items:flex-start;gap:13px;margin:10px 0;font-size:14.5px;color:var(--muted);line-height:1.55;}
+
+/* ---------- tags ---------- */
+.tag{
+  display:inline-block;font-family:var(--mono);font-size:10.5px;font-weight:500;
+  letter-spacing:.06em;padding:2px 8px 3px;border-radius:5px;vertical-align:middle;
+  white-space:nowrap;line-height:1.4;border:1px solid;
+}
+.tag-fact{color:var(--fact-ink);background:var(--fact-bg);border-color:var(--fact-line);}
+.tag-infer{color:var(--infer-ink);background:var(--infer-bg);border-color:var(--infer-line);}
+.tag-flag{color:var(--flag-ink);background:var(--flag-bg);border-color:var(--flag-line);}
+
+/* ---------- TOC ---------- */
+.toc{position:sticky;top:26px;font-size:14px;}
+.toc .toc-h{font-family:var(--mono);font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--faint);margin-bottom:16px;font-weight:500;}
+.toc ol{list-style:none;margin:0;padding:0;counter-reset:toc;}
+.toc li{counter-increment:toc;margin:2px 0;}
+.toc a{
+  display:block;text-decoration:none;color:var(--muted);padding:6px 12px 6px 34px;
+  border-radius:7px;position:relative;line-height:1.35;transition:all .16s ease;border-left:2px solid transparent;
+}
+.toc a::before{content:counter(toc,decimal-leading-zero);position:absolute;left:10px;top:6px;font-family:var(--mono);font-size:10.5px;color:var(--line-strong);font-weight:500;}
+.toc a:hover{background:var(--pine-soft);color:var(--pine-2);}
+.toc a:hover::before{color:var(--pine);}
+
+/* ---------- sections ---------- */
+section{padding-top:30px;margin-top:30px;scroll-margin-top:24px;}
+section + section{border-top:1px solid var(--line);}
+.sec-num{font-family:var(--mono);font-size:12px;letter-spacing:.18em;color:var(--pine);font-weight:500;}
+h2{
+  font-family:var(--display);font-weight:600;font-size:clamp(27px,3.6vw,38px);
+  line-height:1.12;letter-spacing:-.01em;margin:10px 0 6px;color:var(--ink);
+}
+h3{font-family:var(--display);font-weight:600;font-size:22px;line-height:1.25;margin:42px 0 4px;color:var(--pine-2);letter-spacing:-.005em;}
+h3 .n{font-family:var(--mono);font-size:13px;color:var(--faint);font-weight:500;margin-right:10px;letter-spacing:.04em;}
+h4.mini{font-family:var(--mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);font-weight:500;margin:30px 0 8px;}
+p{margin:14px 0;}
+.lead{font-size:18.5px;color:var(--muted);line-height:1.7;}
+strong{font-weight:700;color:var(--ink);}
+em{font-style:italic;}
+a.ext{color:var(--pine);text-decoration:underline;text-decoration-color:var(--fact-line);text-underline-offset:3px;}
+
+/* inline variable */
+.v{font-family:var(--mono);font-size:.9em;color:var(--pine-2);font-weight:500;letter-spacing:.01em;}
+sub,sup{font-family:var(--mono);font-size:.66em;}
+
+/* ---------- callout notes ---------- */
+.note{border-radius:12px;padding:18px 22px 18px 22px;margin:24px 0;position:relative;border:1px solid;font-size:15px;line-height:1.65;}
+.note .lbl{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;font-weight:500;display:block;margin-bottom:8px;}
+.note p{margin:8px 0;}
+.note.fact{background:var(--fact-bg);border-color:var(--fact-line);}
+.note.fact .lbl{color:var(--fact-ink);}
+.note.infer{background:var(--infer-bg);border-color:var(--infer-line);}
+.note.infer .lbl{color:var(--infer-ink);}
+.note.flag{background:var(--flag-bg);border-color:var(--flag-line);}
+.note.flag .lbl{color:var(--flag-ink);}
+
+/* ---------- formula block ---------- */
+.formula{
+  font-family:var(--mono);font-size:14px;line-height:1.85;
+  background:#16221f;color:#e7efe9;border-radius:11px;
+  padding:18px 22px;margin:20px 0;overflow-x:auto;
+  border:1px solid #0a463d;box-shadow:0 4px 18px -10px rgba(14,90,79,.5);
+}
+.formula .c{color:#7fae9d;}      /* comment / annotation */
+.formula .k{color:#f2c879;}      /* key symbol */
+.formula .o{color:#9fd0c2;}      /* operator */
+.formula .big{font-size:15px;}
+
+/* ---------- io grid (stage cards) ---------- */
+.stagecard{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:6px 0 0;margin:26px 0;overflow:hidden;}
+.stagecard .sc-head{padding:20px 26px 18px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,var(--pine-soft),transparent);}
+.stagecard .sc-head .tagline{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--pine);font-weight:500;}
+.stagecard .sc-head h3{margin:8px 0 0;}
+.io{display:grid;grid-template-columns:1fr 1fr;gap:0;}
+.io .cell{padding:18px 26px;border-bottom:1px solid var(--line);}
+.io .cell:nth-child(odd){border-right:1px solid var(--line);}
+.io .cell .k{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);font-weight:500;display:block;margin-bottom:7px;}
+.io .cell .vbody{font-size:14.5px;line-height:1.6;color:var(--muted);}
+.io .cell.full{grid-column:1/-1;border-right:none;}
+
+/* ---------- tables ---------- */
+.tablewrap{margin:24px 0;overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--surface);}
+table{border-collapse:collapse;width:100%;font-size:14px;min-width:480px;}
+caption{caption-side:top;text-align:left;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);padding:16px 18px 4px;font-weight:500;}
+th,td{padding:9px 14px;text-align:left;border-bottom:1px solid var(--line);}
+thead th{font-family:var(--mono);font-size:11px;letter-spacing:.04em;color:var(--muted);font-weight:500;text-transform:none;background:var(--surface-2);border-bottom:1.5px solid var(--line-strong);}
+tbody td{color:var(--muted);}
+tbody td:first-child{color:var(--ink);font-weight:500;}
+td.num,th.num{text-align:right;font-family:var(--mono);font-size:13px;font-variant-numeric:tabular-nums;}
+tbody tr:last-child td{border-bottom:none;}
+tr.best td{background:var(--fact-bg);}
+tr.best td:first-child{color:var(--fact-ink);font-weight:700;}
+tr.best td.num{color:var(--fact-ink);font-weight:600;}
+.yes{color:var(--fact-ink);font-weight:600;}
+.no{color:var(--faint);}
+.subtle{color:var(--faint);font-size:.92em;}
+
+/* ---------- flow diagram ---------- */
+.flow{margin:8px 0 4px;}
+.flow .track{display:flex;gap:14px;align-items:stretch;flex-wrap:wrap;}
+.flow .node{
+  flex:1 1 200px;background:var(--surface);border:1px solid var(--line);border-radius:14px;
+  padding:18px 18px 16px;position:relative;min-width:0;
+}
+.flow .node .st{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--pine);font-weight:500;}
+.flow .node h5{font-family:var(--display);font-size:17px;margin:7px 0 8px;color:var(--ink);font-weight:600;line-height:1.2;}
+.flow .node .d{font-size:13px;color:var(--muted);line-height:1.5;}
+.flow .node .out{margin-top:11px;font-family:var(--mono);font-size:11px;color:var(--pine-2);background:var(--pine-soft);padding:6px 9px;border-radius:6px;line-height:1.45;}
+.flow .arrow{align-self:center;color:var(--line-strong);font-size:22px;flex:0 0 auto;}
+.flow .node.deploy{border-color:var(--pine);background:linear-gradient(180deg,var(--pine-soft),var(--surface));}
+
+ul.clean{margin:14px 0;padding-left:0;list-style:none;}
+ul.clean li{position:relative;padding-left:24px;margin:9px 0;line-height:1.6;}
+ul.clean li::before{content:"";position:absolute;left:4px;top:11px;width:6px;height:6px;border-radius:50%;background:var(--pine);}
+ul.dash{margin:10px 0;padding-left:0;list-style:none;}
+ul.dash li{position:relative;padding-left:20px;margin:6px 0;color:var(--muted);font-size:15px;}
+ul.dash li::before{content:"—";position:absolute;left:0;color:var(--line-strong);}
+
+.footer{border-top:2px solid var(--ink);padding:36px 0 80px;color:var(--faint);font-size:13.5px;font-family:var(--mono);line-height:1.7;}
+.footer b{color:var(--muted);font-weight:500;}
+
+/* fade-in */
+@media (prefers-reduced-motion:no-preference){
+  .fade{opacity:0;transform:translateY(14px);animation:rise .7s cubic-bezier(.2,.7,.2,1) forwards;}
+  @keyframes rise{to{opacity:1;transform:none;}}
+}
+
+@media (max-width:980px){
+  .layout{grid-template-columns:1fr;gap:8px;}
+  .toc{position:static;border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:18px 16px;margin-bottom:18px;}
+  .toc ol{columns:2;column-gap:18px;}
+  .content{max-width:none;}
+  .io{grid-template-columns:1fr;}
+  .io .cell:nth-child(odd){border-right:none;}
+}
+@media (max-width:560px){
+  body{font-size:16px;}
+  .wrap{padding:0 18px;}
+  .hero{padding:60px 0 40px;}
+  .toc ol{columns:1;}
+  .io .cell{padding:16px 18px;}
+}
+</style>
+</head>
+<body>
+
+<header class="hero-band">
+  <div class="wrap">
+    <div class="hero fade">
+      <div class="eyebrow">Pipeline Teardown · 数据 → 训练 → 部署</div>
+      <h1>HARP-VLA
+        <span class="lo">人机对齐表征学习的完整流程拆解</span>
+      </h1>
+      <p class="sub">从数据采集与组成、数据处理、三阶段策略训练，到部署推理与控制 —— 逐环节拆开，并严格区分论文坐实的事实与需要工程推断的细节。</p>
+      <div class="meta">
+        <span><b>论文</b> HARP-VLA (arXiv:2605.31234v1)</span>
+        <span><b>机构</b> Tsinghua IIIS · Shanghai Qi Zhi</span>
+        <span><b>依据</b> 正文 §3–§4 + 附录 A.1–A.6 / Table 1–4 / Table A1–A3</span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <div class="legend fade">
+    <h4>阅读约定 · 事实 vs 推断</h4>
+    <div class="row"><span class="tag tag-fact">论文事实</span><span>论文正文或附录明确写出的内容（架构、损失、数字、数据划分等）。</span></div>
+    <div class="row"><span class="tag tag-infer">工程推断</span><span>论文未写、但可由上下文或常规做法合理推断的实现细节；不是原文结论。</span></div>
+    <div class="row"><span class="tag tag-flag">内部不一致</span><span>论文正文与附录之间相互矛盾之处，已标出更可信的版本。</span></div>
+  </div>
+
+  <div class="layout">
+
+    <!-- ============ TOC ============ -->
+    <aside class="toc fade">
+      <div class="toc-h">目录</div>
+      <ol>
+        <li><a href="#overview">框架总览</a></li>
+        <li><a href="#data">数据采集与组成</a></li>
+        <li><a href="#process">数据处理</a></li>
+        <li><a href="#stage1">训练 · Stage 1</a></li>
+        <li><a href="#stage2">训练 · Stage 2</a></li>
+        <li><a href="#stage3">训练 · Stage 3</a></li>
+        <li><a href="#deploy">部署与推理控制</a></li>
+        <li><a href="#factmap">事实 / 推断总览</a></li>
+        <li><a href="#exp">实验完整梳理</a></li>
+        <li><a href="#limits">局限</a></li>
+      </ol>
+    </aside>
+
+    <!-- ============ CONTENT ============ -->
+    <main class="content">
+
+      <!-- ===== 0. OVERVIEW ===== -->
+      <section id="overview" class="fade" style="border-top:none;padding-top:8px;margin-top:0;">
+        <div class="sec-num">00 / OVERVIEW</div>
+        <h2>框架总览：三阶段 + 部署</h2>
+        <p class="lead">HARP 的核心数据哲学是<strong>少量配对数据做对齐，大量非配对数据做动力学</strong>。它先把人和机器人的视觉表征与潜动作压到同一空间（Stage&nbsp;1），用对齐后的编码器和潜动作伪标签预训练 VLA（Stage&nbsp;2），再用少量真机动作把抽象潜动作落到可执行指令（Stage&nbsp;3），最终在线运行。</p>
+
+        <div class="flow">
+          <div class="track">
+            <div class="node">
+              <div class="st">Stage 1</div>
+              <h5>联合潜动作学习<br>+ 人机视觉对齐</h5>
+              <div class="d">配对视频做跨预测+对齐，非配对视频做自预测。</div>
+              <div class="out">产出 → HARP-VE（对齐视觉编码器）、HARP-LAM（潜动作模型）</div>
+            </div>
+            <div class="arrow">→</div>
+            <div class="node">
+              <div class="st">Stage 2</div>
+              <h5>VLA 潜动作<br>预训练</h5>
+              <div class="d">用 LAM 给视频打统一潜动作标签，把 VLM 训成会预测潜动作的 VLA。</div>
+              <div class="out">产出 → 会输出潜动作 token 的 VLA</div>
+            </div>
+            <div class="arrow">→</div>
+            <div class="node">
+              <div class="st">Stage 3</div>
+              <h5>真实动作<br>微调</h5>
+              <div class="d">加 action head，把潜动作 embedding 解码成归一化真实动作。</div>
+              <div class="out">产出 → HARP-VLA（可执行策略）</div>
+            </div>
+            <div class="arrow">→</div>
+            <div class="node deploy">
+              <div class="st">Deploy</div>
+              <h5>在线推理<br>与控制</h5>
+              <div class="d">相机+指令+本体状态 → 10 步动作 chunk，驱动 18-DoF 真机。</div>
+              <div class="out">在线 → 视觉编码器 → LLM → action head</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="note fact">
+          <span class="lbl">论文事实 · 关键配置一览</span>
+          <p>潜动作：每个 transition <span class="v">N<sub>q</sub>=4</span> 个 token，码本 <span class="v">K=16</span>，潜维 <span class="v">d<sub>q</sub>=128</span>，VQ commitment <span class="v">β=0.25</span>。视觉骨干：Prismatic-7B 的 DINOv2 + SigLIP 融合，输入 224×224，每帧 16×16=256 patch token，融合维 2176。真机：Xarm7（6 DoF）+ Robotera XHand（12 DoF）= 18 DoF。输出：10 步真实动作 chunk。</p>
+        </div>
+      </section>
+
+      <!-- ===== 1. DATA ===== -->
+      <section id="data" class="fade">
+        <div class="sec-num">01 / DATA</div>
+        <h2>数据采集与数据组成</h2>
+
+        <h3><span class="n">1.1</span>数据的逻辑划分</h3>
+        <p>全部训练数据记为 <span class="v">D = D<sub>p</sub> ∪ D<sub>u</sub></span>，分两类，二者承担完全不同的角色。</p>
+        <ul class="clean">
+          <li><strong>配对数据 <span class="v">D<sub>p</sub> = {(H<sub>i</sub>, R<sub>i</sub>, l<sub>i</sub>)}</span></strong>：同一任务、同一语言指令 <span class="v">l<sub>i</sub></span> 下的人类视频 <span class="v">H<sub>i</sub></span> 与机器人视频 <span class="v">R<sub>i</sub></span> 成对出现。作用是<strong>跨本体桥梁</strong>，支撑 Stage-1 的 cross-prediction 与对齐损失。</li>
+          <li><strong>非配对数据 <span class="v">D<sub>u</sub> = {(V<sub>j</sub>, l<sub>j</sub>)}</span></strong>：单条视频，本体 <span class="v">e ∈ {h, r}</span>，不要求成对。作用是<strong>可扩展的动力学监督源</strong>，支撑 self-prediction 与辅助监督。</li>
+        </ul>
+
+        <h3><span class="n">1.2</span>各阶段实际用到的数据集</h3>
+        <p>下表以附录 <strong>Table A1</strong> 为准。「Scale」是预处理与过滤后实际使用的帧数；S1 = HARP-LAM/VE 训练，S2 = VLA 潜动作预训练，S3 = 下游真实动作微调。</p>
+
+        <div class="tablewrap">
+          <table>
+            <caption>Table A1 · 数据使用矩阵（论文事实）</caption>
+            <thead>
+              <tr><th>数据集</th><th>本体</th><th>数据类型</th><th class="num">规模(帧)</th><th>S1</th><th>S2</th><th>S3</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>HOI4D</td><td>Human</td><td>非配对视频</td><td class="num">8.9M</td><td class="yes">✓</td><td class="yes">✓</td><td class="no">—</td></tr>
+              <tr><td>OpenEgo</td><td>Human</td><td>非配对视频</td><td class="num">36.4M</td><td class="yes">✓</td><td class="yes">✓</td><td class="no">—</td></tr>
+              <tr><td>Bridge-V2</td><td>Robot</td><td>非配对视频</td><td class="num">8.6M</td><td class="yes">✓</td><td class="yes">✓</td><td class="no">—</td></tr>
+              <tr><td>Ours-Unpaired</td><td>DexHand</td><td>非配对视频</td><td class="num">3.6M</td><td class="yes">✓</td><td class="yes">✓</td><td class="no">—</td></tr>
+              <tr><td>RH20T</td><td>Human-Robot</td><td>配对视频</td><td class="num">8.16M</td><td class="yes">✓</td><td class="yes">✓</td><td class="no">—</td></tr>
+              <tr><td>Human2Robot</td><td>Human-Robot</td><td>配对视频</td><td class="num">9.9M</td><td class="yes">✓</td><td class="yes">✓</td><td class="no">—</td></tr>
+              <tr><td>Ours-Paired</td><td>Human-DexHand</td><td>配对视频</td><td class="num">5.7M</td><td class="yes">✓</td><td class="yes">✓</td><td class="no">—</td></tr>
+              <tr><td>CALVIN</td><td>Robot / Sim</td><td>真实动作示教</td><td class="num">1.1M</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td></tr>
+              <tr><td>Ours-Real</td><td>DexHand / Real</td><td>真实动作示教</td><td class="num">0.5M</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h4 class="mini">几个关键点</h4>
+        <ul class="clean">
+          <li><strong>S1/S2 完全不用真实动作标签</strong>，只用视频观测 + LAM 生成的潜动作伪标签。真实动作标签<strong>只在 Stage&nbsp;3 出现</strong>（CALVIN 与 Ours-Real）。</li>
+          <li><strong>Ours-Real 是「拆开用」的</strong>：它的视频在 S1/S2 也参与（只取视频帧），真实动作只在 S3 用。CALVIN 则是纯下游集，S1/S2 完全不碰。两个真实动作数据集里，只有 Ours-Real 的视频进入预训练。</li>
+          <li><strong>RH20T 只用挑选过的子集</strong>而非全量，因为它视角异构、配对质量参差。</li>
+          <li>评测 trial 从 finetuning 示教中 <strong>hold-out</strong>。</li>
+        </ul>
+
+        <div class="note flag">
+          <span class="lbl">内部不一致 · 数据集清单</span>
+          <p>正文 §4.1 只列了 OpenEgo / Bridge-V2 / RH20T / Human2Robot / 自采配对集，而附录 Table A1 比正文多列了 <strong>HOI4D</strong> 和 <strong>Ours-Unpaired</strong>。这是正文与附录的一处不一致，Table A1 更完整，应以它为准。</p>
+        </div>
+
+        <h3><span class="n">1.3</span>硬件平台</h3>
+        <p>真机为 <strong>Xarm7 机械臂 + Robotera XHand 灵巧手，共 18 DoF</strong>（臂 6 + 手 12）。观测来自<strong>第三视角相机 + 腕部相机</strong>。<span class="tag tag-fact">论文事实</span></p>
+
+        <h3><span class="n">1.4</span>每条视频的辅助标注 <span class="v">A<sub>X</sub> = {K<sub>X</sub>, E<sub>X</sub>}</span></h3>
+        <ul class="clean">
+          <li><strong><span class="v">K<sub>X</sub></span></strong>：2D 物体位置轨迹（object position tracks），捕捉操作效果。</li>
+          <li><strong><span class="v">E<sub>X</sub></span></strong>：2D 轨迹 —— 人类取手腕，机器人取末端执行器（wrist / end-effector），作为粗粒度运动意图的代理。</li>
+        </ul>
+        <p>设计动机是：物体运动和粗粒度的手部/末端运动比原始外观更跨本体共享，用它们正则化潜动作，让潜动作抓<strong>运动动力学</strong>而非<strong>外观</strong> —— 对没有配对监督的非配对视频尤其重要。</p>
+      </section>
+
+      <!-- ===== 2. PROCESS ===== -->
+      <section id="process" class="fade">
+        <div class="sec-num">02 / PREPROCESS</div>
+        <h2>数据处理（附录 A.1）</h2>
+        <p class="lead">处理的目标是为配对数据建立<strong>帧级对应</strong>，给后续 cross-prediction 提供帧级视觉线索。两步：提取关键点、做时间对齐。</p>
+
+        <h3><span class="n">2.1</span>关键点提取</h3>
+
+        <h4 class="mini">物体关键点 · 专门处理重度遮挡</h4>
+        <p>沿用 object-flow 思路。流程是：若无语言指令，先用 <strong>Qwen3-VL-8B-Instruct</strong> 生成被操作物体的描述 → 用 <strong>GroundingDINO</strong> 在物体首次出现帧定位 bbox → 在该首帧提取关键点 → 用 <strong>TAPIR</strong> 跟踪。</p>
+        <p>选 TAPIR 是因为它能利用历史上下文推断当前位置，并给出<strong>遮挡/可见性分数</strong>，从而在遮挡帧降低不可靠预测的权重。论文强调：现有管线在完全遮挡下通常失败且很少显式处理，这正是该设计看似复杂却必要的原因。</p>
+
+        <h4 class="mini">手部关键点</h4>
+        <ul class="clean">
+          <li><strong>人类视频</strong>：用 <strong>WiLoR</strong>（单目 3D 手部重建，回归 MANO 参数），取手腕在图像平面的 2D 像素坐标。</li>
+          <li><strong>机器人视频</strong>：用<strong>相机外参 + 记录的 3D 腕部位姿</strong>，做标准透视投影得到每帧 2D 坐标。</li>
+        </ul>
+
+        <h3><span class="n">2.2</span>时间对齐 DTW</h3>
+        <p>配对采集时虽要求动作相似，但执行速度/子动作时长难以严格一致。处理方式：</p>
+        <ul class="clean">
+          <li>以<strong>手部关键点的欧氏距离</strong>作为人-机相似度度量；</li>
+          <li>用 <strong>DTW</strong> 求最优匹配路径，以<strong>机器人视频为时间参考</strong>（执行更均匀），通过<strong>删/复制帧</strong>重采样人类视频；</li>
+          <li>得到时长与速度都同步的配对视频，采样时在机器人时间轴上取匹配的人-机 transition。</li>
+        </ul>
+        <p>处理后 <span class="v">D<sub>p</sub> = {(Ĥ<sub>i</sub>, R̂<sub>i</sub>, l<sub>i</sub>, A<sub>Ĥi</sub>, A<sub>R̂i</sub>)}</span>，帽号表示已时间对齐（后文省略）。这也意味着采集时可以只专注于「动作模式匹配」，把严格时间对齐交给 DTW。</p>
+
+        <div class="note infer">
+          <span class="lbl">工程推断 · 未给出的细节</span>
+          <p>DTW 的距离阈值、重采样上下限、物体关键点数量 <span class="v">N<sub>K</sub></span> 的具体取值、遮挡分数衰减权重的函数形式，论文都没给。</p>
+        </div>
+      </section>
+
+      <!-- ===== 3. STAGE 1 ===== -->
+      <section id="stage1" class="fade">
+        <div class="sec-num">03 / TRAINING · STAGE 1</div>
+        <h2>联合潜动作学习 + 人机视觉对齐</h2>
+        <p class="lead">全文最核心、最重的阶段，产出两样东西：<strong>HARP-VE</strong>（对齐视觉编码器）与 <strong>HARP-LAM</strong>（潜动作模型）。它把「潜动作学习」与「人机对齐」耦合进同一套训练里。</p>
+
+        <div class="stagecard">
+          <div class="sc-head"><div class="tagline">Stage 1 · I/O 概览</div><h3 style="margin-top:8px;">输入 / 输出 / 数据 / 损失</h3></div>
+          <div class="io">
+            <div class="cell"><span class="k">输入</span><div class="vbody">视频帧（配对 + 非配对）、语言指令 <span class="v">l<sub>X</sub></span>、预处理得到的 2D 物体/手部辅助标注。<strong>无真实动作。</strong></div></div>
+            <div class="cell"><span class="k">输出</span><div class="vbody">对齐视觉编码器 HARP-VE（含机器人 adapter）、潜动作模型 HARP-LAM（编码器+码本+解码器）。</div></div>
+            <div class="cell"><span class="k">数据源</span><div class="vbody">D<sub>p</sub>（RH20T、Human2Robot、Ours-Paired）+ D<sub>u</sub>（HOI4D、OpenEgo、Bridge-V2、Ours-Unpaired）+ Ours-Real 视频。</div></div>
+            <div class="cell"><span class="k">总损失</span><div class="vbody"><span class="v">L<sub>stage1</sub> = L<sub>lam</sub> + λ<sub>aux</sub>·L<sub>aux</sub> + λ<sub>align</sub>·L<sub>align</sub></span></div></div>
+          </div>
+        </div>
+
+        <h3><span class="n">3.1</span>人机视觉编码 &amp; 码本</h3>
+        <p>视觉编码用<strong>同一套骨干</strong>，靠「加不加 adapter」区分本体：</p>
+        <div class="formula"><span class="o">Φ</span><sub>θ</sub>(X, e) = <span class="k">F(X)</span> <span class="c">// e = human：直接走冻结原始编码器</span><br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; = <span class="k">T</span><sub>θ</sub><span class="k">(X)</span> <span class="c">// e = robot：F + 机器人专属 adapter</span></div>
+        <ul class="clean">
+          <li><strong>人类帧</strong>：直接走冻结的原始编码器 <span class="v">F</span>，不做任何改动，输出 <span class="v">Z<sub>X</sub> = F(X)</span>。</li>
+          <li><strong>机器人帧</strong>：走 <span class="v">T<sub>θ</sub></span>（F + adapter），输出 <span class="v">Z<sub>X</sub> = T<sub>θ</sub>(X)</span>；同时仍保留一份<strong>冻结参考</strong> <span class="v">Z<sub>X</sub><sup>0</sup> = F(X)</span>（机器人图过纯 F、不过 adapter），后面对齐损失要用。</li>
+        </ul>
+        <p>注意：对人类而言 <span class="v">Z<sub>X</sub></span> 与 <span class="v">Z<sub>X</sub><sup>0</sup></span> 是同一个东西（都过 F）；<strong>只有机器人才有 adapted（T<sub>θ</sub>）和 frozen（F）两个版本</strong>。设计意图是把人类侧钉死在预训练视觉空间当锚点，只把机器人侧往人类语义空间拉。</p>
+
+        <h4 class="mini">骨干与 adapter（论文事实）</h4>
+        <p>骨干是 Prismatic-7B 的 <strong>DINOv2 + SigLIP 融合编码器</strong>（输入 224×224，每帧 256 个 patch token，融合维 2176）。adapter 是在 DINOv2 和 SigLIP <strong>每一层的 attention 块和 FFN 块之后各插一个 2 层 MLP</strong>，输入当前特征、输出残差加回原特征；第一层高斯初始化、第二层零初始化，所以<strong>初始时刻残差恒为 0，机器人路径与人类路径完全相同</strong>，训练才逐步把机器人特征推向人类。</p>
+
+        <div class="note fact">
+          <span class="lbl">论文事实 · 码本（Codebook）是什么</span>
+          <p>码本属于潜动作模型 LAM、不属于视觉编码器，但接在视觉编码之后。它是 VQ-VAE 的<strong>量化字典</strong> —— 一组可学习离散向量：规模 <span class="v">K=16</span> 个、每个维度 <span class="v">d<sub>q</sub>=128</span>。LAM 编码器从一段视觉 transition 推出连续潜动作 <span class="v">a</span>，码本把它量化（取最近邻）成离散 <span class="v">q</span>，每个 transition 用 <span class="v">N<sub>q</sub>=4</span> 个这样的 token 表示。其意义在于：人和机器人的动力学都被强制压进同一个只有 16 个条目的码本，潜动作就成了<strong>跨本体共享的离散动作词表</strong> —— 这是动作层面对齐的核心载体。</p>
+        </div>
+
+        <h3><span class="n">3.2</span>自预测 vs 跨预测</h3>
+        <p>两者共用同一组三元组，只是 decoder 的「条件」和「目标」换了来源：</p>
+        <div class="formula"><span class="c">// 逆动力学：从两帧推潜动作</span><br>a<sub>t</sub><sup>X</sup> = <span class="k">E</span><sub>θ</sub>(z<sub>t</sub><sup>X</sup>, z<sub>t+Δt</sub><sup>X</sup>, l<sub>X</sub>)<br>q<sub>t</sub><sup>X</sup> = <span class="k">Q</span><sub>θ</sub>(a<sub>t</sub><sup>X</sup>) <span class="c">// 码本量化</span><br><span class="c">// 前向动力学：预测未来视觉特征</span><br>Ŷ<sub>t</sub><sup>X</sup> = <span class="k">D</span><sub>θ</sub>(z̃<sub>t</sub><sup>X</sup>, q<sub>t</sub><sup>X</sup>, l<sub>X</sub>)</div>
+
+        <p>各分量含义：</p>
+        <ul class="dash">
+          <li><span class="v">z<sub>t</sub><sup>X</sup></span>：视频 X 第 t 帧的 patch 级视觉特征（编码器输出）。</li>
+          <li><span class="v">z<sub>t+Δt</sub><sup>X</sup></span>：transition 第二帧的特征，<span class="v">Δt</span> 是随机采样的时间间隔。</li>
+          <li><span class="v">l<sub>X</sub></span>：语言指令（冻结 T5 编码）。</li>
+          <li><span class="v">E<sub>θ</sub></span>：LAM 编码器（逆动力学）—— 看「当前帧+未来帧+指令」推断中间发生了什么动作。</li>
+          <li><span class="v">Q<sub>θ</sub> / q<sub>t</sub><sup>X</sup></span>：码本量化器 / 量化后的离散潜动作。</li>
+          <li><span class="v">D<sub>θ</sub></span>：LAM 解码器（前向动力学）—— 给「条件帧+离散动作+指令」预测未来视觉特征。</li>
+          <li><span class="v">z̃<sub>t</sub><sup>X</sup></span>：解码器的条件特征 —— <strong>自/跨预测的区别就在这里</strong>。</li>
+          <li><span class="v">Ŷ<sub>t</sub><sup>X</sup> / Y<sub>t</sub><sup>X</sup></span>：解码器预测的未来特征 / 对应真值未来特征（也随自/跨而变）。</li>
+        </ul>
+
+        <div class="note fact">
+          <span class="lbl">论文事实 · 预测目标是什么</span>
+          <p>预测的是<strong>未来帧的视觉特征 <span class="v">z<sub>t+Δt</sub></span></strong>（patch token），不是动作、不是原始像素、也不是潜动作。潜动作 <span class="v">q<sub>t</sub></span> 在这里是 decoder 的<strong>输入/条件</strong>（由 encoder 逆动力学推出的中间瓶颈码），唯独不是预测目标。整个重建发生在 DINOv2+SigLIP 的<strong>特征空间</strong>，论文没有像素解码器。</p>
+        </div>
+
+        <h4 class="mini">自预测 · 非配对视频 V</h4>
+        <div class="formula">z̃<sub>t</sub><sup>V</sup> = z<sub>t</sub><sup>V</sup> &nbsp;&nbsp;&nbsp; Y<sub>t</sub><sup>V</sup> = z<sub>t+Δt</sub><sup>V</sup> &nbsp;&nbsp;<span class="c">// 动作、条件、目标全在同一条视频内</span></div>
+        <p>从 V 的 transition 推动作，用 V 自己的当前帧当条件，预测 V 自己的未来帧。标准视频自监督动力学。</p>
+
+        <h4 class="mini">跨预测 · 配对视频 (H, R)</h4>
+        <p>潜动作从<strong>源本体</strong> transition 推出，但 decoder 用<strong>目标本体</strong>的当前帧当条件、预测目标本体的未来帧。两个方向：</p>
+        <div class="formula"><span class="c">// 源 = 人类：人类潜动作去预测机器人未来</span><br>z̃<sub>t</sub><sup>H</sup> = z<sub>t</sub><sup>R</sup> &nbsp;&nbsp;&nbsp; Y<sub>t</sub><sup>H</sup> = z<sub>t+Δt</sub><sup>R</sup><br><br><span class="c">// 源 = 机器人：对称，机器人潜动作去预测人类未来</span><br>z̃<sub>t</sub><sup>R</sup> = z<sub>t</sub><sup>H</sup> &nbsp;&nbsp;&nbsp; Y<sub>t</sub><sup>R</sup> = z<sub>t+Δt</sub><sup>H</sup></div>
+        <p>上标读法要留意：<span class="v">Ŷ<sub>t</sub><sup>H</sup></span> 里的上标 H 指<strong>潜动作来自人类（源）</strong>，而条件帧和目标帧的视觉内容其实都是机器人（目标）。Figure&nbsp;2 右侧标注「Input(Human), Condition(Robot), Predict(Robot)」说的正是这件事。意义在于：人类潜动作若真能预测机器人未来（反之亦然），就证明潜动作跨本体共享 —— 这一步把潜动作学习和人机对齐硬绑在一起。</p>
+
+        <h3><span class="n">3.3</span>总损失逐项拆解</h3>
+        <div class="formula big"><span class="o">L</span><sub>stage1</sub> = <span class="k">L<sub>lam</sub></span> + λ<sub>aux</sub>·<span class="k">L<sub>aux</sub></span> + λ<sub>align</sub>·<span class="k">L<sub>align</sub></span></div>
+        <div class="note infer">
+          <span class="lbl">工程推断 · 权重数值</span>
+          <p>三项权重 <span class="v">λ<sub>aux</sub>、λ<sub>align</sub></span>（及下面的 <span class="v">λ<sub>K</sub>、λ<sub>E</sub></span>、两个 margin <span class="v">m<sub>s</sub>、m<sub>t</sub></span>）的<strong>具体数值论文全部没给</strong>。</p>
+        </div>
+
+        <h4 class="mini">① L<sub>lam</sub> · 潜动作预测损失</h4>
+        <p><strong>通俗讲</strong>：模型拿到当前帧和未来帧，先推断一个码概括两帧间画面发生了什么变化（即潜动作），再用「当前帧 + 这个码 + 指令」预测未来帧的特征；预测越接近真实未来帧，损失越小。这逼着码必须真的装下「画面怎么变」的信息。</p>
+        <div class="formula">ℓ<sub>lam</sub> = ‖ Ŷ<sub>t</sub><sup>X</sup> − Y<sub>t</sub><sup>X</sup> ‖<sub>2</sub><sup>2</sup> + ℓ<sub>vq</sub><br>ℓ<sub>vq</sub> = ‖ sg[a] − q ‖<sub>2</sub><sup>2</sup> + β·‖ a − sg[q] ‖<sub>2</sub><sup>2</sup> &nbsp;&nbsp;<span class="c">// β = 0.25</span></div>
+        <ul class="dash">
+          <li><strong>前一项</strong>：未来特征预测项，decoder 预测 <span class="v">Ŷ</span> 与真值未来特征 <span class="v">Y</span> 的 L2 平方差（自/跨预测共用）。</li>
+          <li><strong>ℓ<sub>vq</sub></strong>：标准 VQ 损失。<span class="v">sg[·]</span> 是 stop-gradient；第一项是<strong>码本项</strong>，把码本向量 <span class="v">q</span> 拉向编码器输出 <span class="v">a</span>（只更新码本）；第二项是 <strong>commitment 项</strong>，把 <span class="v">a</span> 拉向 <span class="v">q</span>（只更新编码器）。</li>
+        </ul>
+        <p><strong>数据源</strong>：所有视频（配对+非配对）。<strong>标签</strong>：无真实动作 —— 目标 <span class="v">Y</span> 就是视频自己的未来帧特征，纯自监督。</p>
+
+        <h4 class="mini">② L<sub>aux</sub> · 掩码共享线索辅助损失</h4>
+        <p><strong>通俗讲</strong>：学码的同时，额外要求模型从两个辅助 token 预测出「物体在画面里的 2D 位置」和「手腕(人)/末端(机器人)的 2D 位置」；预测越准损失越小，被遮挡看不见的点不计入。作用是把码往「物体和手怎么动」上引导，避免它去记外观。</p>
+        <div class="formula">K̂<sub>X</sub> = G<sub>K</sub>(u<sub>X,K</sub>) ∈ ℝ<sup>N<sub>K</sub>×2</sup> &nbsp;<span class="c">// 物体关键点</span><br>Ê<sub>X</sub> = G<sub>E</sub>(u<sub>X,E</sub>) ∈ ℝ<sup>2</sup> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="c">// 手腕/末端位置</span><br><br>ℓ<sub>K</sub> = Σ M·H(K̂, K) / (Σ M + ε) &nbsp;<span class="c">// 带可见性掩码的 Huber</span><br>ℓ<sub>aux</sub> = λ<sub>K</sub>·ℓ<sub>K</sub> + λ<sub>E</sub>·ℓ<sub>E</sub></div>
+        <ul class="dash">
+          <li><span class="v">H</span>：Huber 损失；<span class="v">M ∈ {0,1}</span>：<strong>可见性掩码</strong>，遮挡/不可见点权重置 0（呼应 TAPIR 的可见性分数）。</li>
+          <li><span class="v">ε</span>：防分母为零的小常数；<span class="v">N<sub>K</sub></span>：物体关键点数（论文未给具体值）。</li>
+          <li>这些位置之所以有用，是因为物体和手的运动在人和机器人间相近，而外观差很多 —— 只有抓运动信息，码才能跨本体通用。</li>
+        </ul>
+        <p><strong>数据源</strong>：所有视频。<strong>标签</strong>：物体轨迹 + 手腕/末端轨迹的 2D 坐标，但这是预处理阶段<strong>自动提取的伪标签</strong>（GroundingDINO+TAPIR 提物体、WiLoR/MANO 提人手、外参投影提机器人末端），既非人工标注、也非真实动作。</p>
+
+        <h4 class="mini">③ L<sub>align</sub> · 源相对 + 配对判别对齐损失（本文最大创新，仅用配对数据）</h4>
+        <p>对一对 <span class="v">(H,R)</span>，先做视频级 pooling <span class="v">φ</span>（帧内空间平均 → 帧间时间平均 → L2 归一化）得三个向量，距离用余弦距离 <span class="v">d(u,v)=1−cos(u,v)</span>，记 <span class="v">d<sub>i</sub><sup>+</sup> = d(f<sub>R</sub>, f<sub>H</sub>)</span>：</p>
+        <div class="formula">f<sub>H</sub> = φ(Z<sub>H</sub>) &nbsp;<span class="c">// 冻结人类特征（人类只过 F）</span><br>f<sub>R0</sub> = φ(Z<sub>R</sub><sup>0</sup>) <span class="c">// 冻结机器人特征（机器人过纯 F）</span><br>f<sub>R</sub> = φ(Z<sub>R</sub>) &nbsp;<span class="c">// adapted 机器人特征（机器人过 T</span><sub>θ</sub><span class="c">）</span></div>
+
+        <p><strong>源相对项 SR</strong>（通俗讲：过了 adapter 的机器人特征，要比没过的时候更靠近对应人类特征；只要求「比原来近」，不规定近到某个固定值）：</p>
+        <div class="formula">ℓ<sub>SR</sub> = [ m<sub>s</sub> + d(f<sub>R</sub>, f<sub>H</sub>) − d(f<sub>R0</sub>, f<sub>H</sub>) ]<sub>+</sub> &nbsp;<span class="c">// [x]</span><sub>+</sub><span class="c"> = max(x,0)</span></div>
+
+        <p><strong>配对判别项 PD</strong>（通俗讲：一对正确配对的人机距离，要明显小于「这个机器人」与同批次里「别的不配对人类」之间的距离，保证不同配对仍分得清、不塌成一团）：</p>
+        <div class="formula">d̄<sub>R→H</sub>(i) = (1/(B−1)) · Σ<sub>j≠i</sub> d(f<sub>Ri</sub>, f<sub>Hj</sub>) <span class="c">// 非配对平均距离</span><br>ℓ<sub>ε</sub> = [ m<sub>t</sub> + d<sub>i</sub><sup>+</sup> − d̄<sub>ε</sub>(i) ]<sub>+</sub> &nbsp; ε ∈ {R→H, H→R}<br>ℓ<sub>PD</sub> = λ<sub>R→H</sub>·ℓ<sub>R→H</sub> + λ<sub>H→R</sub>·ℓ<sub>H→R</sub></div>
+        <p>两个方向各算一次，<span class="v">m<sub>t</sub></span> 是判别 margin。<strong>当 batch <span class="v">B=1</span> 时丢掉 PD 项、只留 SR。</strong>合成 <span class="v">ℓ<sub>align</sub> = ℓ<sub>SR</sub> + ℓ<sub>PD</sub></span>。</p>
+        <p><strong>数据源</strong>：仅配对数据 D<sub>p</sub>。<strong>标签</strong>：没有动作标签 —— 唯一的「监督信号」是「哪条人类视频配哪条机器人视频」这个配对关系（来自配对采集设计），特征本身仍自监督。</p>
+
+        <div class="note fact">
+          <span class="lbl">论文事实 · Stage 1 标签总括</span>
+          <p>整个 Stage 1 <strong>不用任何真实动作标签</strong>。三类监督信号是：未来帧本身（L<sub>lam</sub> 的重建目标）、自动提取的 2D 关键点/轨迹伪标签（L<sub>aux</sub>）、人机配对关系（L<sub>align</sub>）。</p>
+        </div>
+        <div class="note infer">
+          <span class="lbl">工程推断 · 未明确</span>
+          <p>各 <span class="v">λ</span> 与 margin <span class="v">m<sub>s</sub>/m<sub>t</sub></span> 数值、transition 的 <span class="v">Δt</span> 采样分布、<span class="v">N<sub>K</sub></span> 取值均未给。φ 的「先帧内空间平均、再帧间时间平均、最后 L2 归一化」是附录 A.4 明确的。</p>
+        </div>
+      </section>
+
+      <!-- ===== 4. STAGE 2 ===== -->
+      <section id="stage2" class="fade">
+        <div class="sec-num">04 / TRAINING · STAGE 2</div>
+        <h2>VLA 潜动作预训练</h2>
+        <p class="lead">用 Stage-1 的 HARP-LAM 给任意视频帧打<strong>统一潜动作标签</strong>，再把一个 VLM 训练成会预测这些潜动作的 VLA。</p>
+
+        <div class="stagecard">
+          <div class="sc-head"><div class="tagline">Stage 2 · I/O 概览</div><h3 style="margin-top:8px;">输入 / 输出 / 数据 / 损失</h3></div>
+          <div class="io">
+            <div class="cell"><span class="k">输入</span><div class="vbody">语言指令 <span class="v">l<sub>X</sub></span> + 视觉帧 <span class="v">x<sub>t</sub></span>。</div></div>
+            <div class="cell"><span class="k">输出</span><div class="vbody"><span class="v">N<sub>q</sub></span> 个潜动作 token <span class="v">{q̂<sub>i</sub>}</span>（由 VLM 预测）。</div></div>
+            <div class="cell"><span class="k">数据源</span><div class="vbody">与 Stage 1 相同的视频集，<strong>只用视频 + LAM 抽取的潜动作标签</strong>。</div></div>
+            <div class="cell"><span class="k">损失</span><div class="vbody">对潜动作 token 的<strong>交叉熵</strong>（语言式预测离散动作索引）。</div></div>
+          </div>
+        </div>
+
+        <h4 class="mini">打标签 + 训练目标（论文事实）</h4>
+        <div class="formula"><span class="c">// 用冻结的 HARP-LAM 给每帧打统一潜动作标签</span><br>q<sub>t</sub><sup>X</sup> = Q<sub>θ</sub>( E<sub>θ</sub>(z<sub>t</sub><sup>X</sup>, z<sub>t+Δt</sub><sup>X</sup>, l<sub>X</sub>) )<br><br><span class="c">// VLA 以交叉熵预测这些离散潜动作 token</span><br>L<sub>pretrain</sub> = −𝔼 [ Σ<sub>i=1..N<sub>q</sub></sub> log π<sub>θ</sub>( q̂<sub>i</sub> = q<sub>t</sub><sup>X,i</sup> | x<sub>t</sub>, l<sub>X</sub> ) ]</div>
+        <p>即把潜动作当成离散 token 序列「语言式」预测：这套做法保留了预训练 VLM 原有的视觉推理与语言理解能力，再额外赋予它动作建模能力。</p>
+
+        <div class="note fact">
+          <span class="lbl">论文事实 · 两个关键工程选择</span>
+          <p><strong>(1) 复制 adapter 权重</strong>：VLA 用和 HARP-LAM 同一个视觉编码器，并把 Stage-1 学到的 adapter 权重<strong>复制</strong>进 VLM 的视觉编码器。因为 PrismaticVLM 的融合视觉编码器在网络规模预训练时是冻结的，复制权重后能保住已有的对齐性质。论文进一步论证：VLM 预训练以人类数据为主、人类表征更鲁棒，HARP 固定人类侧、只把机器人侧拉向人类侧，所以原 VLM 视觉编码器与 LLM 之间的对齐基本保留，利于后续 VLA 训练。</p>
+          <p><strong>(2) 架构</strong>：VLA 沿用 <strong>OpenVLA-OFT</strong>，建在 Prismatic-7B 上（融合 SigLIP+DINOv2 + projector + LLaMA-2 LLM）。</p>
+        </div>
+        <div class="note infer">
+          <span class="lbl">工程推断 / 被消融的开关 · 是否冻结视觉编码器</span>
+          <p>「Stage-2 是否冻结对齐后的视觉编码器」是一个被消融的开关。实验显示<strong>冻结更好</strong>（见实验三）：adapter 已桥接人机视觉 gap 之后，冻结能同时保住「学到的人机对齐」和「网络规模预训练的视觉特征」。</p>
+        </div>
+      </section>
+
+      <!-- ===== 5. STAGE 3 ===== -->
+      <section id="stage3" class="fade">
+        <div class="sec-num">05 / TRAINING · STAGE 3</div>
+        <h2>真实动作微调</h2>
+        <p class="lead">Stage 2 的 VLA 只会输出抽象潜动作，不能直接控制。用少量真实动作机器人数据微调，加一个 action head 把潜动作映射成可执行指令。最终模型称 <strong>HARP-VLA</strong>。</p>
+
+        <div class="stagecard">
+          <div class="sc-head"><div class="tagline">Stage 3 · I/O 概览</div><h3 style="margin-top:8px;">输入 / 输出 / 数据 / 损失</h3></div>
+          <div class="io">
+            <div class="cell"><span class="k">输入</span><div class="vbody">视觉 + 指令（+ proprio），VLA 内部产生潜动作 embedding。</div></div>
+            <div class="cell"><span class="k">输出</span><div class="vbody">归一化真实动作（10 步 chunk）。</div></div>
+            <div class="cell"><span class="k">数据源</span><div class="vbody"><strong>真机/仿真示教</strong>：CALVIN（1.1M，纯下游）+ Ours-Real（0.5M，真机）。量很小。</div></div>
+            <div class="cell"><span class="k">损失 / 优化</span><div class="vbody">action head 从零训练用 <strong>L1 损失</strong>；同时用 <strong>LoRA</strong> 微调 VLA 主干。</div></div>
+          </div>
+        </div>
+
+        <h3><span class="n">5.1</span>训练数据与标签</h3>
+        <p>参与 S3 的只有两个数据集（Table A1 的 S3 列）：</p>
+        <ul class="clean">
+          <li><strong>CALVIN</strong>（Robot/Sim，1.1M 帧）：纯下游集，S1/S2 完全不碰，只在 S3 用。</li>
+          <li><strong>Ours-Real</strong>（真机 DexHand，0.5M 帧）：视频在 S1/S2 用过，但真实动作只在 S3 用。</li>
+        </ul>
+        <p><strong>标签是真实动作标签</strong> —— 遥操采集时记录的实际机器人指令。真机 18 DoF（Xarm7 臂 6 + XHand 手 12），输出 10 步动作 chunk。这是整个流程里<strong>第一次出现真实动作标签</strong>（S1/S2 全程没有）。</p>
+
+        <h3><span class="n">5.2</span>「把潜动作 embedding 映射成归一化真实动作」是什么意思</h3>
+        <ul class="clean">
+          <li><strong>背景</strong>：Stage 2 训出来的 VLA 只会吐潜动作 token —— 抽象的运动码（码本里的离散动作），不能直接驱动电机。</li>
+          <li><strong>做法</strong>：加一个从零训练的 <strong>action head</strong>（小模块，结构沿用 OpenVLA-OFT），输入是 VLA 内部产生的<strong>潜动作 embedding</strong>（预测出的潜动作 token 对应的表征/隐状态），输出是归一化的真实动作（10 步 chunk）；用 L1 损失训练，同时用 LoRA 微调 VLA 主干。</li>
+          <li><strong>「归一化」的含义</strong>：机器人各维动作（关节角、位置、夹爪等）量纲/范围不同，训练前按数据统计缩放到统一区间（如 [−1,1]），网络预测归一化值（优化更稳、各维损失更均衡），部署时再反归一化成真实物理指令。</li>
+          <li><strong>一句话</strong>：action head 就是把「抽象潜动作」翻译成「可执行（归一化）机器人指令」的那座桥，而它需要、S1/S2 一直没有的真实动作监督，正是 Stage 3 这点真机数据提供的。</li>
+        </ul>
+        <div class="note infer">
+          <span class="lbl">工程推断 · 未明确</span>
+          <p>action head 的具体结构（层数、MLP/transformer）、LoRA rank、proprio 如何注入（Figure 3 标了「Instruction &amp; Proprio」为输入但没给融合方式）、action chunk 内部表示、「normalized real action」的具体归一化方案，论文都没给（按 OpenVLA-OFT 标准做法理解）。</p>
+        </div>
+      </section>
+
+      <!-- ===== 6. DEPLOY ===== -->
+      <section id="deploy" class="fade">
+        <div class="sec-num">06 / DEPLOYMENT</div>
+        <h2>部署与推理控制</h2>
+
+        <div class="stagecard">
+          <div class="sc-head"><div class="tagline">Inference · I/O</div><h3 style="margin-top:8px;">在线运行时的输入与输出</h3></div>
+          <div class="io">
+            <div class="cell"><span class="k">输入</span><div class="vbody">第三视角 + 腕部相机图像、任务指令、本体感知状态（proprio）。</div></div>
+            <div class="cell"><span class="k">输出</span><div class="vbody"><strong>10 步真实动作 chunk</strong>。</div></div>
+            <div class="cell full"><span class="k">硬件</span><div class="vbody">Xarm7 + Robotera XHand，18 DoF（臂 6 + 手 12）。<span class="tag tag-fact">论文事实</span></div></div>
+          </div>
+        </div>
+
+        <div class="note infer">
+          <span class="lbl">工程推断（强支撑）· 在线计算图</span>
+          <p>部署时 LAM 的 <strong>decoder 与码本不再使用</strong> —— 它们只是 Stage-1/2 用来「造标签」和「对齐」的工具。在线运行的是：<strong>对齐视觉编码器（F+adapter） → LLM 主干（预测潜动作） → action head（把潜动作 embedding 解码成真实动作）</strong>。这与 LAPA/UniVLA 的范式一致，但论文没有专门画出推理图，所以严格说属于工程推断。</p>
+        </div>
+        <div class="note infer">
+          <span class="lbl">工程推断 · 未明确的控制策略</span>
+          <p>10 步 chunk 是开环执行还是滚动重规划（receding horizon）、控制频率、闭环替换策略，论文均未写。</p>
+        </div>
+      </section>
+
+      <!-- ===== 7. FACT MAP ===== -->
+      <section id="factmap" class="fade">
+        <div class="sec-num">07 / FACT vs INFERENCE</div>
+        <h2>事实 / 推断总览</h2>
+        <p class="lead">一张表收束全文：哪些是论文坐实的，哪些需要工程推断，以及那处内部不一致。</p>
+
+        <div class="tablewrap">
+          <table>
+            <caption>论文坐实的事实</caption>
+            <thead><tr><th>环节</th><th>论文明确写出的内容</th></tr></thead>
+            <tbody>
+              <tr><td>框架</td><td>三阶段框架；各阶段数据来源与是否使用真实动作。</td></tr>
+              <tr><td>损失</td><td>所有损失的数学形式（L<sub>lam</sub> / L<sub>aux</sub> / L<sub>align</sub> 的 SR+PD / L<sub>pretrain</sub> 交叉熵 / L1）。</td></tr>
+              <tr><td>LAM</td><td>N<sub>q</sub>=4、K=16、d<sub>q</sub>=128、β=0.25；1 keypoint token + 1 end-effector token；架构沿用 UniVLA。</td></tr>
+              <tr><td>视觉</td><td>DINOv2+SigLIP 融合 / Prismatic-7B；adapter 形式（每层 attn+FFN 后 2 层 MLP）与初始化（高斯+零）。</td></tr>
+              <tr><td>预测关系</td><td>cross/self-prediction 的条件-目标关系；预测目标是未来视觉特征。</td></tr>
+              <tr><td>数据处理</td><td>具体模型：Qwen3-VL-8B、GroundingDINO、TAPIR、WiLoR/MANO、DTW。</td></tr>
+              <tr><td>平台/输出</td><td>18 DoF 平台、10 步 chunk；所有实验数字。</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="tablewrap">
+          <table>
+            <caption>需要推断 / 未坐实</caption>
+            <thead><tr><th>环节</th><th>论文没给、需推断的细节</th></tr></thead>
+            <tbody>
+              <tr><td>损失权重</td><td>全部 λ（λ<sub>aux</sub>、λ<sub>align</sub>、λ<sub>K</sub>、λ<sub>E</sub>）与 margin m<sub>s</sub>/m<sub>t</sub> 的数值。</td></tr>
+              <tr><td>优化超参</td><td>学习率 / batch / 调度等。</td></tr>
+              <tr><td>采样/标注</td><td>Δt 采样分布、物体关键点数 N<sub>K</sub>、DTW 阈值与重采样上下限。</td></tr>
+              <tr><td>Stage 3</td><td>action head 结构、LoRA rank、proprio 融合方式、归一化方案。</td></tr>
+              <tr><td>推理</td><td>在线计算图（强支撑）、chunk 执行/控制频率/闭环策略。</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="note flag">
+          <span class="lbl">内部不一致 · 一处</span>
+          <p>正文数据集列表少了 Table A1 里的 <strong>HOI4D</strong> 与 <strong>Ours-Unpaired</strong>。以 Table A1 为准。</p>
+        </div>
+      </section>
+
+      <!-- ===== 8. EXPERIMENTS ===== -->
+      <section id="exp" class="fade">
+        <div class="sec-num">08 / EXPERIMENTS</div>
+        <h2>实验完整梳理</h2>
+        <p class="lead">论文从三个角度层层递进验证：<strong>(1)</strong> 是否对齐人机视觉表征与潜动作；<strong>(2)</strong> 对齐视觉编码器是否提升下游策略；<strong>(3)</strong> HARP-VLA 整体策略性能。三组实验构成因果链：先在纯表征指标上证明拉近了人机，再在冻结编码器的下游策略上证明这种对齐有用，最后在完整 VLA 上证明端到端有效。</p>
+
+        <h3><span class="n">8.1</span>实验一 · 表征与潜动作对齐</h3>
+        <p><strong>设置</strong>：在 <strong>93 条 hold-out 配对人机示教</strong>上评估（不参与训练）。统一帧采样、统一 pooling φ、统一归一化与余弦度量，默认用 DINOv2+SigLIP 融合分支。三种评估：UMAP 可视化（定性）、配对余弦距离（几何对齐）、双向跨本体检索（语义可区分性）。所有 HARP 变体共享同一骨干、adapter、数据划分、预处理、训练预算，只改对齐目标或 pooling 空间。</p>
+
+        <div class="tablewrap">
+          <table>
+            <caption>Table 1 · 双向跨本体检索 R@1 (%)</caption>
+            <thead><tr><th>方法</th><th class="num">H2R R@1</th><th class="num">R2H R@1</th><th class="num">Avg. R@1</th></tr></thead>
+            <tbody>
+              <tr><td>Unadapted</td><td class="num">44.09</td><td class="num">43.01</td><td class="num">43.55</td></tr>
+              <tr><td>HR</td><td class="num">45.16</td><td class="num">45.16</td><td class="num">45.16</td></tr>
+              <tr><td>HARP-HR</td><td class="num">46.24</td><td class="num">60.22</td><td class="num">53.23</td></tr>
+              <tr><td>HARP-L2</td><td class="num">70.97</td><td class="num">52.69</td><td class="num">61.83</td></tr>
+              <tr><td>HARP-SR</td><td class="num">84.95</td><td class="num">64.52</td><td class="num">74.74</td></tr>
+              <tr class="best"><td>HARP-SRPD</td><td class="num">87.10</td><td class="num">69.89</td><td class="num">78.50</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p><strong>配对余弦距离（Fig 5）</strong>：HR-Align 类目标在同一均值池化空间里几乎不降低配对距离；HARP 各变体显著拉近 adapted 机器人特征与配对人类特征。<strong>UMAP（Fig 4）</strong>：对齐前人/机明显分簇、配对样本也远；对齐后配对样本明显靠拢，潜动作空间同理。</p>
+        <p><strong>结论</strong>：HARP-SRPD 把平均 R@1 从 43.55 提到 78.50，大幅超过 HR-Align；在 SR 基础上加 PD 项进一步提升检索，说明 PD 增强了跨本体可区分性。</p>
+
+        <h3><span class="n">8.2</span>实验二 · 对齐表征用于下游策略</h3>
+        <p><strong>设置</strong>：沿用 HR-Align 的 <strong>RLBench</strong> 协议，18 个任务，<strong>冻结视觉编码器</strong>，所有方法用同一策略架构、策略头、动作空间、示教数据、训练计划、优化预算 —— 唯一变量是被冻结的视觉编码器。每任务 75 episodes，共 1350 episodes/方法。</p>
+
+        <div class="tablewrap">
+          <table>
+            <caption>Table 2 · RLBench 平均成功率 (%)</caption>
+            <thead><tr><th>方法</th><th class="num">Avg.</th></tr></thead>
+            <tbody>
+              <tr><td>Unadapted</td><td class="num">37.56</td></tr>
+              <tr><td>HR</td><td class="num">39.70</td></tr>
+              <tr><td>HR-Style</td><td class="num">38.22</td></tr>
+              <tr><td>HARP-HR</td><td class="num">35.11</td></tr>
+              <tr><td>HARP-HR-Style</td><td class="num">40.07</td></tr>
+              <tr><td>HARP-L2</td><td class="num">40.78</td></tr>
+              <tr><td>HARP-SR</td><td class="num">43.41</td></tr>
+              <tr class="best"><td>HARP-SRPD</td><td class="num">46.59</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p><strong>结论</strong>：HARP-SRPD 最优（37.56→46.59）；PD 项在下游也带来增益。值得注意的是 <strong>HARP-HR（35.11）甚至低于 Unadapted</strong>，说明把 HR-Align 目标硬塞进 HARP 设置并不奏效。</p>
+
+        <h3><span class="n">8.3</span>实验三 · HARP-VLA 整体策略</h3>
+        <p><strong>设置</strong>：预训练预测对齐潜动作，在 <strong>CALVIN ABC→D</strong>（最难设置：ABC 训练、未见环境 D 测试）和真机上微调。统一输入第三视角+腕部图像+指令+proprio，输出 10 步 chunk。真机 4 个任务，每任务 60 trials。基线：OpenVLA、UniVLA（训练方法相近）、OpenVLA-OFT（架构相近）、π0、π0.5。消融：L2 替代 SRPD、预训练时不冻结视觉编码器。</p>
+
+        <div class="tablewrap">
+          <table>
+            <caption>Table 3 · 真机成功率 (%)，每任务 60 trials</caption>
+            <thead><tr><th>模型</th><th class="num">Pick</th><th class="num">Push</th><th class="num">Press</th><th class="num">Flip</th><th class="num">Avg.</th></tr></thead>
+            <tbody>
+              <tr><td>π0</td><td class="num">58.3</td><td class="num">75.0</td><td class="num">56.7</td><td class="num">35.0</td><td class="num">56.3</td></tr>
+              <tr><td>π0.5</td><td class="num">71.7</td><td class="num">83.3</td><td class="num">68.3</td><td class="num">53.3</td><td class="num">69.2</td></tr>
+              <tr><td>OpenVLA</td><td class="num">0.0</td><td class="num">23.3</td><td class="num">18.3</td><td class="num">0.0</td><td class="num">10.4</td></tr>
+              <tr><td>UniVLA</td><td class="num">38.3</td><td class="num">61.7</td><td class="num">31.7</td><td class="num">21.7</td><td class="num">38.4</td></tr>
+              <tr><td>OpenVLA-OFT</td><td class="num">51.7</td><td class="num">71.7</td><td class="num">76.7</td><td class="num">43.3</td><td class="num">60.9</td></tr>
+              <tr><td>HARP-VLA (L2)</td><td class="num">70.0</td><td class="num">71.7</td><td class="num">81.7</td><td class="num">56.7</td><td class="num">70.0</td></tr>
+              <tr><td>HARP-VLA (w/o F.)</td><td class="num">76.7</td><td class="num">80.0</td><td class="num">78.3</td><td class="num">58.3</td><td class="num">73.3</td></tr>
+              <tr class="best"><td>HARP-VLA (Ours)</td><td class="num">76.7</td><td class="num">81.7</td><td class="num">85.0</td><td class="num">61.7</td><td class="num">76.3</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="tablewrap">
+          <table>
+            <caption>Table 4 · CALVIN ABC→D 成功率 (%) 与平均长度</caption>
+            <thead><tr><th>模型</th><th class="num">T1</th><th class="num">T2</th><th class="num">T3</th><th class="num">T4</th><th class="num">T5</th><th class="num">Avg.Len</th></tr></thead>
+            <tbody>
+              <tr><td>π0</td><td class="num">92.3</td><td class="num">82.4</td><td class="num">72.1</td><td class="num">62.2</td><td class="num">53.7</td><td class="num">3.627</td></tr>
+              <tr><td>π0.5</td><td class="num">94.4</td><td class="num">86.0</td><td class="num">76.4</td><td class="num">69.7</td><td class="num">61.0</td><td class="num">3.875</td></tr>
+              <tr><td>OpenVLA</td><td class="num">91.3</td><td class="num">77.8</td><td class="num">62.0</td><td class="num">52.1</td><td class="num">43.5</td><td class="num">3.270</td></tr>
+              <tr><td>UniVLA</td><td class="num">95.4</td><td class="num">85.5</td><td class="num">75.4</td><td class="num">66.9</td><td class="num">56.5</td><td class="num">3.800</td></tr>
+              <tr><td>OpenVLA-OFT</td><td class="num">94.2</td><td class="num">86.4</td><td class="num">78.0</td><td class="num">70.4</td><td class="num">62.7</td><td class="num">3.917</td></tr>
+              <tr><td>HARP-VLA (L2)</td><td class="num">95.8</td><td class="num">89.7</td><td class="num">81.3</td><td class="num">72.8</td><td class="num">64.8</td><td class="num">4.044</td></tr>
+              <tr><td>HARP-VLA (w/o F.)</td><td class="num">98.8</td><td class="num">93.9</td><td class="num">86.1</td><td class="num">77.7</td><td class="num">68.5</td><td class="num">4.250</td></tr>
+              <tr class="best"><td>HARP-VLA (Ours)</td><td class="num">99.8</td><td class="num">96.7</td><td class="num">91.3</td><td class="num">84.4</td><td class="num">75.9</td><td class="num">4.481</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h4 class="mini">结论（论文明确）</h4>
+        <ul class="clean">
+          <li>HARP-VLA 把 CALVIN Avg.Len 提到 <strong>4.481</strong>、真机平均成功率提到 <strong>76.3%</strong>，均为最佳。摘要里「比最强基线高 7.1%」即 76.3 − 69.2（π0.5）= 7.1。</li>
+          <li><strong>SRPD vs L2</strong>：L2 在特征对齐和 RLBench 上已有竞争力，但在 VLA 预训练阶段 SRPD 更好 —— CALVIN +0.437、真机 +6.3%。说明对齐质量在检索/RLBench 上看不全，放进完整 VLA 才显现优势。</li>
+          <li><strong>冻结视觉编码器</strong>：Stage-2 冻结 HARP 初始化的编码器进一步带来 CALVIN 4.250→4.481、真机 73.3%→76.3%。</li>
+        </ul>
+        <div class="note flag">
+          <span class="lbl">注意 · 两个口径别混淆</span>
+          <p>摘要的 <strong>+7.1%</strong> 是「对最强基线」的差；正文消融里的 <strong>+6.3%</strong> 是 SRPD 相对 L2 的差。两者口径不同。</p>
+        </div>
+      </section>
+
+      <!-- ===== 9. LIMITS ===== -->
+      <section id="limits" class="fade">
+        <div class="sec-num">09 / LIMITATIONS</div>
+        <h2>局限（论文明确）</h2>
+        <p>HARP-VLA 依赖<strong>任务配对的人机视频和辅助线索</strong>作为跨本体桥梁，性能受桥梁数据多样性、时间对齐与共享线索鲁棒性影响。当前评测只覆盖<strong>单机械臂桌面操作</strong>和有限的人类视频源。未来要扩到更大更杂的人类视频、对噪声线索更鲁棒、并验证更多本体 / 长程 / 双臂操作。</p>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<div class="wrap">
+  <div class="footer">
+    <p><b>文档说明</b> — 本文所有数字、损失、架构与数据划分均来自上传的 HARP-VLA 论文正文（§3–§4）与附录（A.1–A.6，Table A1–A3，Table 1–4）。标注为「论文事实」者可在原文找到直接依据；标注为「工程推断」者为合理推测，非原文结论。</p>
+    <p style="margin-top:14px;"><b>HARP-VLA · 完整流程拆解</b> &nbsp;|&nbsp; 数据采集 → 数据处理 → 三阶段训练 → 部署推理 &nbsp;|&nbsp; arXiv:2605.31234v1</p>
+  </div>
+</div>
+
+</body>
+</html>
