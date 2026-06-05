@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JoyAI-RA 0.1 · 完整技术 Pipeline</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;800;900&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
+<style>
+:root{
+  --ink:#0a0e16;
+  --ink2:#0e1420;
+  --panel:#121a28;
+  --panel2:#16202f;
+  --line:#243246;
+  --line2:#1a2433;
+  --txt:#dfe7f0;
+  --txt-dim:#8595a8;
+  --txt-faint:#5c6b80;
+  --cyan:#3fe0c5;
+  --cyan-d:#1c8d7e;
+  --amber:#f5a623;
+  --web:#7c9cf0;     /* web data */
+  --human:#f06b9c;   /* egocentric human */
+  --sim:#b07cf0;     /* simulation */
+  --real:#5fd07a;    /* real robot */
+  --warn:#f5734a;
+  --mono:'IBM Plex Mono',ui-monospace,monospace;
+  --sans:'IBM Plex Sans','PingFang SC','Microsoft YaHei',sans-serif;
+  --disp:'Archivo','PingFang SC','Microsoft YaHei',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  background:var(--ink);
+  color:var(--txt);
+  font-family:var(--sans);
+  line-height:1.6;
+  font-size:15px;
+  -webkit-font-smoothing:antialiased;
+  background-image:
+    linear-gradient(var(--line2) 1px,transparent 1px),
+    linear-gradient(90deg,var(--line2) 1px,transparent 1px);
+  background-size:44px 44px;
+  background-position:center top;
+}
+body::before{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:radial-gradient(ellipse 80% 50% at 50% -10%,rgba(63,224,197,.10),transparent 60%),
+             radial-gradient(ellipse 60% 40% at 90% 30%,rgba(245,166,35,.06),transparent 60%);
+}
+.wrap{max-width:1180px;margin:0 auto;padding:0 26px 120px;position:relative;z-index:1}
+
+/* ---------- HEADER ---------- */
+header{padding:72px 0 30px;border-bottom:1px solid var(--line)}
+.kicker{font-family:var(--mono);font-size:12px;letter-spacing:.32em;color:var(--cyan);text-transform:uppercase;margin-bottom:18px;display:flex;align-items:center;gap:12px}
+.kicker::before{content:"";width:40px;height:1px;background:var(--cyan)}
+h1{font-family:var(--disp);font-weight:900;font-size:clamp(38px,6vw,76px);line-height:.96;letter-spacing:-.02em}
+h1 .sub{display:block;font-size:clamp(15px,2vw,22px);font-weight:600;color:var(--txt-dim);letter-spacing:.01em;margin-top:14px;font-family:var(--sans)}
+.meta-row{display:flex;flex-wrap:wrap;gap:10px;margin-top:28px}
+.tag{font-family:var(--mono);font-size:11.5px;padding:6px 12px;border:1px solid var(--line);border-radius:3px;color:var(--txt-dim);background:rgba(255,255,255,.015)}
+.tag b{color:var(--cyan);font-weight:600}
+.legend{display:flex;flex-wrap:wrap;gap:20px;margin-top:26px;font-family:var(--mono);font-size:12px;color:var(--txt-dim)}
+.legend span{display:flex;align-items:center;gap:8px}
+.dot{width:11px;height:11px;border-radius:2px;display:inline-block}
+.dot.solid{background:var(--cyan)}
+.dot.dash{border:1.5px dashed var(--warn);background:transparent}
+
+/* ---------- PHASE ---------- */
+.phase{margin-top:64px;position:relative}
+.phase-head{display:flex;align-items:flex-start;gap:20px;margin-bottom:30px}
+.phase-num{font-family:var(--disp);font-weight:900;font-size:46px;line-height:1;color:transparent;-webkit-text-stroke:1.4px var(--accent,var(--cyan));flex-shrink:0;min-width:78px}
+.phase-title h2{font-family:var(--disp);font-weight:800;font-size:27px;letter-spacing:-.01em}
+.phase-title .en{font-family:var(--mono);font-size:12.5px;color:var(--accent,var(--cyan));letter-spacing:.18em;text-transform:uppercase;margin-top:5px;display:block}
+.phase-title p{color:var(--txt-dim);font-size:14px;margin-top:10px;max-width:760px}
+
+/* connector */
+.flow-down{display:flex;justify-content:center;margin:6px 0;height:46px;align-items:center}
+.flow-down svg{height:46px;width:24px}
+.flow-down .lbl{font-family:var(--mono);font-size:11px;color:var(--txt-faint);margin-left:12px}
+
+/* ---------- CARDS / PANELS ---------- */
+.panel{background:linear-gradient(180deg,var(--panel),var(--ink2));border:1px solid var(--line);border-radius:10px;padding:22px;position:relative;overflow:hidden}
+.panel.accentbar::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--accent,var(--cyan))}
+.grid{display:grid;gap:16px}
+.g4{grid-template-columns:repeat(4,1fr)}
+.g3{grid-template-columns:repeat(3,1fr)}
+.g2{grid-template-columns:repeat(2,1fr)}
+@media(max-width:920px){.g4{grid-template-columns:repeat(2,1fr)}.g3{grid-template-columns:1fr}.g2{grid-template-columns:1fr}}
+@media(max-width:560px){.g4{grid-template-columns:1fr}}
+
+.src{background:var(--panel);border:1px solid var(--line);border-top:3px solid var(--c);border-radius:8px;padding:18px;display:flex;flex-direction:column;gap:10px}
+.src .pct{font-family:var(--disp);font-weight:900;font-size:34px;line-height:1;color:var(--c)}
+.src .nm{font-weight:600;font-size:15px}
+.src .en{font-family:var(--mono);font-size:10.5px;color:var(--txt-faint);letter-spacing:.06em;text-transform:uppercase}
+.src ul{list-style:none;font-size:12.5px;color:var(--txt-dim);display:flex;flex-direction:column;gap:5px;margin-top:2px}
+.src ul li{padding-left:14px;position:relative}
+.src ul li::before{content:"▸";position:absolute;left:0;color:var(--c);font-size:10px;top:2px}
+.src .role{font-family:var(--mono);font-size:11px;color:var(--c);background:color-mix(in srgb,var(--c) 12%,transparent);border-radius:4px;padding:6px 9px;margin-top:auto}
+
+.statbar{display:flex;flex-wrap:wrap;gap:14px;margin-top:18px}
+.stat{flex:1 1 130px;background:var(--ink2);border:1px solid var(--line);border-radius:7px;padding:13px 15px}
+.stat .v{font-family:var(--disp);font-weight:800;font-size:24px;color:var(--human)}
+.stat .k{font-family:var(--mono);font-size:10.5px;color:var(--txt-faint);letter-spacing:.05em;text-transform:uppercase;margin-top:3px}
+
+h3.blk{font-family:var(--disp);font-weight:700;font-size:18px;margin:0 0 6px;display:flex;align-items:center;gap:10px}
+h3.blk .ix{font-family:var(--mono);font-size:12px;color:var(--accent,var(--cyan));border:1px solid var(--line);padding:2px 7px;border-radius:4px}
+.lead{color:var(--txt-dim);font-size:13.5px;margin-bottom:16px;max-width:820px}
+
+/* formula block */
+.fml{background:var(--ink);border:1px solid var(--line);border-left:3px solid var(--accent,var(--cyan));border-radius:6px;padding:16px 18px;margin:14px 0;overflow-x:auto}
+.fml .cap{font-family:var(--mono);font-size:11px;color:var(--txt-faint);margin-bottom:8px;letter-spacing:.04em}
+.katex{font-size:1.04em}
+
+/* io table for training stages */
+.stage{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--panel)}
+.stage .top{padding:16px 20px;display:flex;align-items:center;gap:14px;border-bottom:1px solid var(--line);background:linear-gradient(90deg,color-mix(in srgb,var(--c) 14%,transparent),transparent)}
+.stage .top .sn{font-family:var(--mono);font-size:12px;color:var(--c);border:1px solid var(--c);border-radius:20px;padding:3px 11px;flex-shrink:0}
+.stage .top .tt{font-family:var(--disp);font-weight:800;font-size:18px}
+.stage .top .goal{font-size:12.5px;color:var(--txt-dim);margin-left:auto;text-align:right;max-width:340px}
+.stage .body{padding:18px 20px;display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+@media(max-width:720px){.stage .body{grid-template-columns:1fr}.stage .top .goal{display:none}}
+.iorow{background:var(--ink2);border:1px solid var(--line2);border-radius:7px;padding:13px 15px}
+.iorow .lab{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--c);margin-bottom:7px}
+.iorow .val{font-size:13px;color:var(--txt-dim)}
+.iorow .val code{font-family:var(--mono);font-size:11.5px;background:rgba(255,255,255,.04);padding:1px 5px;border-radius:3px;color:var(--txt)}
+.full{grid-column:1/-1}
+
+/* uncertainty tag */
+.unc{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10px;letter-spacing:.08em;color:var(--warn);border:1px dashed var(--warn);border-radius:4px;padding:2px 8px;vertical-align:middle}
+.confirmed{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10px;letter-spacing:.08em;color:var(--cyan);border:1px solid var(--cyan-d);border-radius:4px;padding:2px 8px;vertical-align:middle}
+
+/* architecture diagram */
+.arch{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:stretch}
+@media(max-width:820px){.arch{grid-template-columns:1fr}}
+.tower{border:1px solid var(--line);border-radius:10px;padding:20px;background:var(--panel);position:relative}
+.tower .badge{position:absolute;top:-11px;left:18px;font-family:var(--mono);font-size:11px;background:var(--ink);border:1px solid var(--c);color:var(--c);padding:3px 10px;border-radius:20px}
+.tower h4{font-family:var(--disp);font-weight:800;font-size:20px;margin:8px 0 4px}
+.tower .sz{font-family:var(--mono);font-size:12px;color:var(--c)}
+.tower p{font-size:13px;color:var(--txt-dim);margin-top:10px}
+.chiprow{display:flex;flex-wrap:wrap;gap:7px;margin-top:12px}
+.chip{font-family:var(--mono);font-size:11px;padding:4px 9px;border:1px solid var(--line);border-radius:4px;color:var(--txt-dim);background:var(--ink2)}
+
+.steps{counter-reset:s;display:flex;flex-direction:column;gap:0}
+.step{display:flex;gap:16px;padding:15px 0;border-bottom:1px dashed var(--line2)}
+.step:last-child{border-bottom:none}
+.step .n{counter-increment:s;font-family:var(--mono);font-size:12px;color:var(--accent,var(--cyan));flex-shrink:0;width:30px;height:30px;border:1px solid var(--line);border-radius:50%;display:flex;align-items:center;justify-content:center}
+.step .n::before{content:counter(s,decimal-leading-zero)}
+.step .c{flex:1}
+.step .c b{font-weight:600;color:var(--txt)}
+.step .c .d{font-size:13px;color:var(--txt-dim);margin-top:3px}
+
+.note{background:rgba(245,115,74,.07);border:1px solid rgba(245,115,74,.35);border-radius:8px;padding:15px 18px;margin-top:16px;font-size:13px;color:#f3c0ad}
+.note b{color:var(--warn);font-family:var(--mono);font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;display:block;margin-bottom:6px}
+.good{background:rgba(63,224,197,.06);border:1px solid rgba(63,224,197,.3);border-radius:8px;padding:15px 18px;margin-top:16px;font-size:13px;color:#bfeee5}
+.good b{color:var(--cyan);font-family:var(--mono);font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;display:block;margin-bottom:6px}
+
+/* pipeline mini for human video */
+.pline{display:flex;align-items:stretch;gap:0;flex-wrap:wrap;margin-top:6px}
+.pnode{flex:1;min-width:150px;background:var(--ink2);border:1px solid var(--line);border-radius:7px;padding:13px 14px;position:relative;margin:6px}
+.pnode .t{font-family:var(--mono);font-size:11px;color:var(--human);letter-spacing:.04em;margin-bottom:5px}
+.pnode .x{font-size:12.5px;color:var(--txt-dim)}
+.parrow{display:flex;align-items:center;color:var(--txt-faint);font-size:18px;padding:0 2px}
+
+.foot{margin-top:70px;border-top:1px solid var(--line);padding-top:26px;font-size:12px;color:var(--txt-faint);font-family:var(--mono);line-height:1.8}
+.foot b{color:var(--txt-dim)}
+small.sym{font-family:var(--mono);color:var(--txt);background:rgba(255,255,255,.04);padding:0 4px;border-radius:3px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Vision-Language-Action · 完整技术流水线</div>
+  <h1>JoyAI-RA 0.1
+    <span class="sub">从数据采集 → 数据处理 → 模型架构 → 三阶段训练 → 推理部署的端到端 Pipeline</span>
+  </h1>
+  <div class="meta-row">
+    <span class="tag">机构 <b>JD · Joy Future Academy</b></span>
+    <span class="tag">骨干 <b>VLM 4B + Action Expert 600M</b></span>
+    <span class="tag">动作生成 <b>Flow Matching</b></span>
+    <span class="tag">融合结构 <b>Perceiver + AdaLN</b></span>
+    <span class="tag">arXiv <b>2604.20100v2</b></span>
+  </div>
+  <div class="legend">
+    <span><i class="dot solid"></i> 论文明确陈述 / 公式确证</span>
+    <span><i class="dot dash"></i> 论文未明说 · 工程推断（结合历史讨论）</span>
+  </div>
+</header>
+
+<!-- ============ PHASE 01 DATA ============ -->
+<section class="phase" style="--accent:var(--cyan)">
+  <div class="phase-head">
+    <div class="phase-num">01</div>
+    <div class="phase-title">
+      <h2>数据采集与组成</h2>
+      <span class="en">Multi-Source Heterogeneous Pretraining Corpus</span>
+      <p>核心理念是「多源异构预训练」。数据池由四个互补来源构成（图 2a 的占比），按 <b>语义 → 行为 → 可控动作 → 真实约束</b> 的层次刻意组织，为后续动作学习注入不同性质的先验。</p>
+    </div>
+  </div>
+
+  <div class="grid g4">
+    <div class="src" style="--c:var(--web)">
+      <div class="pct">12%</div>
+      <div>
+        <div class="nm">多模态网页数据</div>
+        <div class="en">Multi-Modal Web Data</div>
+      </div>
+      <ul>
+        <li>Cambrian-10M（视觉指令调优）</li>
+        <li>RefSpatial（空间指代）</li>
+        <li>Galaxea（通用 VQA）</li>
+        <li>Cosmos-Reason1-SFT（具身常识）</li>
+      </ul>
+      <div class="role">作用：语义层 — 注入感知与语言先验，<b>不含可执行轨迹</b></div>
+    </div>
+
+    <div class="src" style="--c:var(--human)">
+      <div class="pct">33%</div>
+      <div>
+        <div class="nm">第一视角人类操作 · EgoLive</div>
+        <div class="en">Egocentric Human Data（自研）</div>
+      </div>
+      <ul>
+        <li>RGB 第一视角 · 60 FPS</li>
+        <li>家庭 3,779 / 零售 3,686 / 物流 2,518 任务</li>
+        <li>长时序 + 短时序并存</li>
+        <li>逐帧子任务标注（per-frame subtask）</li>
+      </ul>
+      <div class="role">作用：行为先验 + 长尾语义覆盖（最大自研资产）</div>
+    </div>
+
+    <div class="src" style="--c:var(--sim)">
+      <div class="pct">24%</div>
+      <div>
+        <div class="nm">仿真数据</div>
+        <div class="en">Simulation Data</div>
+      </div>
+      <ul>
+        <li>InternData-A1（大规模合成示范）</li>
+        <li>GenieSim3.0-Dataset（高保真）</li>
+        <li>InternData-M1</li>
+        <li>从中精选子集 (curated subsets)</li>
+      </ul>
+      <div class="role">作用：可扩展 / 可控动作监督 + 视觉分布对齐</div>
+    </div>
+
+    <div class="src" style="--c:var(--real)">
+      <div class="pct">31%</div>
+      <div>
+        <div class="nm">真实机器人数据</div>
+        <div class="en">Real-Robot Data</div>
+      </div>
+      <ul>
+        <li>Open-X-Embodiment（跨本体）</li>
+        <li>AgiBot-World</li>
+        <li>Galaxea Open-World</li>
+        <li>JDAgibot（京东自采）</li>
+      </ul>
+      <div class="role">作用：接触不确定性 / 传感噪声 / 硬件约束</div>
+    </div>
+  </div>
+
+  <div class="panel accentbar" style="--accent:var(--human);margin-top:20px">
+    <h3 class="blk"><span class="ix">EgoLive</span> 关键统计与价值定位 <span class="confirmed">论文 §3.2</span></h3>
+    <p class="lead">相对先前 egocentric 数据集（如 EgoDex 约 100 类）实现数量级跨越。语义宽度 + 标注粒度是它在消融中被证明为「真机性能关键贡献项」的根本原因。</p>
+    <div class="statbar">
+      <div class="stat"><div class="v">1,969</div><div class="k">物体类别 Object Cat.</div></div>
+      <div class="stat"><div class="v">1,796</div><div class="k">动作类别 Action Cat.</div></div>
+      <div class="stat"><div class="v">10,000+</div><div class="k">任务总数 Tasks</div></div>
+      <div class="stat"><div class="v">60 FPS</div><div class="k">采集帧率 Frame Rate</div></div>
+      <div class="stat"><div class="v">逐帧</div><div class="k">子任务标注粒度</div></div>
+    </div>
+  </div>
+</section>
+
+<div class="flow-down" style="--accent:var(--cyan)">
+  <svg viewBox="0 0 24 46"><defs><marker id="ar" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 Z" fill="#3fe0c5"/></marker></defs><line x1="12" y1="0" x2="12" y2="38" stroke="#3fe0c5" stroke-width="1.5" marker-end="url(#ar)"/></svg>
+  <span class="lbl">所有带动作标签的数据进入统一表示</span>
+</div>
+
+<!-- ============ PHASE 02 PROCESSING ============ -->
+<section class="phase" style="--accent:var(--amber)">
+  <div class="phase-head">
+    <div class="phase-num" style="-webkit-text-stroke-color:var(--amber)">02</div>
+    <div class="phase-title">
+      <h2>数据处理：统一动作空间</h2>
+      <span class="en">Unified Action Space — 跨本体异构性的核心机制</span>
+      <p>把来自不同本体 / 不同来源的不兼容动作表示，统一成「相机系 6-DoF + 定长向量 + 掩码」的共同物理语义空间，这是异构数据能「拼起来训练」的必要前提。</p>
+    </div>
+  </div>
+
+  <div class="grid g2">
+    <div class="panel accentbar" style="--accent:var(--amber)">
+      <h3 class="blk"><span class="ix" style="color:var(--amber);border-color:var(--amber)">2.1</span> 相机系末端表示</h3>
+      <p class="lead">对所有带动作标签的数据（真机 / retarget 后人类轨迹 / 仿真），以<b>相机坐标系</b>表达末端执行器状态与动作。</p>
+      <div class="fml" style="--accent:var(--amber)">
+        <div class="cap">6-DoF 末端位姿分解</div>
+        $$ \text{6-DoF} = \underbrace{(\Delta x,\Delta y,\Delta z)}_{\text{3D 平移}} \;\oplus\; \underbrace{(\omega_x,\omega_y,\omega_z)}_{\text{3D 轴角}} $$
+      </div>
+      <ul style="list-style:none;font-size:13px;color:var(--txt-dim);display:flex;flex-direction:column;gap:9px;margin-top:6px">
+        <li><b style="color:var(--amber)">物理语义一致：</b>同一动作向量在不同机器人上对应同样的空间位移/旋转，与底座位置、运动学构型无关。</li>
+        <li><b style="color:var(--amber)">与视觉对齐：</b>图像输入与动作预测共用同一视角，便于「视觉接地」的动作预测。</li>
+      </ul>
+      <div class="note">
+        <b>为何是相机系？跨数据源的唯一共存参考系</b>
+        机器人 base 系 / 关节系对人类视频不存在；世界系在人类视频里未定义。<u>只有相机系是三种数据都自然存在的坐标系</u>——把「统一」从算法挑战降级为工程实现。<br><br>
+        <span class="unc">隐含问题</span> 相机系是<b>非惯性系</b>（头部/腕部相机会动；腕部相机与末端刚性连接时更极端）。VLA 范式靠「每帧重看、单 chunk 内视作局部惯性」回避了跨时间一致性问题——论文用的「consistent physical semantics」指<b>跨本体</b>一致，非跨时间一致。动作参考系是哪个相机、腕部 vs 主相机分工，论文未明说。
+      </div>
+    </div>
+
+    <div class="panel accentbar" style="--accent:var(--amber)">
+      <h3 class="blk"><span class="ix" style="color:var(--amber);border-color:var(--amber)">2.2</span> 定长动作维度 + 掩码</h3>
+      <p class="lead">定义一个覆盖所有出现过的执行器组的<b>定长向量</b>，不存在的自由度在损失中被掩码、不参与梯度。</p>
+      <div class="fml" style="--accent:var(--amber)">
+        <div class="cap">统一动作向量结构（示意）</div>
+$$\mathbf{a}=\big[\,\mathbf{arm}_L^{6}\,\|\,\mathbf{arm}_R^{6}\,\|\,g_L\,\|\,g_R\,\|\,\mathbf{hand}_L^{N}\,\|\,\mathbf{hand}_R^{N}\,\cdots\big]$$
+      </div>
+      <div class="chiprow">
+        <span class="chip">左臂 6</span><span class="chip">右臂 6</span>
+        <span class="chip">左夹爪 1</span><span class="chip">右夹爪 1</span>
+        <span class="chip">左灵巧手 N</span><span class="chip">右灵巧手 N</span>
+      </div>
+      <p style="font-size:13px;color:var(--txt-dim);margin-top:14px">
+        <b style="color:var(--amber)">掩码机制：</b>例如人类视频 retarget 到 ALOHA（双臂夹爪）时，只有 14 维有效，灵巧手维度被 mask；retarget 到 Agibot G1 则启用灵巧手关节角。<u>同一固定维度</u>从单臂夹爪到双臂灵巧手系统通用。
+      </p>
+      <div class="note">
+        <b>动作标签的物理细节 — 论文黑盒</b>
+        每一维的量纲 / 归一化方式 / 坐标系参考点 / 有效范围，论文均未披露。
+      </div>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-top:18px;border-color:var(--human)">
+    <h3 class="blk"><span class="ix" style="color:var(--human);border-color:var(--human)">2.3</span> 人类视频处理管线 · 把「手」变成「机器人末端」 <span class="unc">论文仅 3 步抽象描述</span></h3>
+    <p class="lead">EgoLive 进入训练前的关键预处理。论文原文仅有「自研 hand-pose 估计 → retarget 到多种本体 → 投影到统一动作空间」，下方补充工程实现路径。</p>
+    <div class="pline">
+      <div class="pnode"><div class="t">① RGB 帧</div><div class="x">单目第一视角视频，60 FPS</div></div>
+      <div class="parrow">→</div>
+      <div class="pnode"><div class="t">② Hand-Pose 估计</div><div class="x">自研管线恢复人手轨迹。工程上常用 <b>HaMeR / FrankMocap</b> 输出 <b>MANO 参数</b>(β,θ,t)</div></div>
+      <div class="parrow">→</div>
+      <div class="pnode"><div class="t">③ Retarget</div><div class="x">映射到 <b>ALOHA · Fourier · Agibot G1</b>。夹爪=抓握阈值；灵巧手=关节角优化</div></div>
+      <div class="parrow">→</div>
+      <div class="pnode"><div class="t">④ 投影统一空间</div><div class="x">相机系 6-DoF + 定长向量，与机器人数据同损失训练</div></div>
+    </div>
+    <div class="note">
+      <b>MANO ≠ 估计模型</b>
+      MANO 是手部的<b>参数化几何模型</b>（参数 → 778 顶点网格 + 21 关键点），本身不吃图像；真正做估计的是 HaMeR / FrankMocap 等，它们以 MANO 参数为输出格式。链路：<small class="sym">RGB → 估计模型 → MANO 参数 → MANO 几何 → 关键点 → Retarget → 机器人动作</small>。<br><br>
+      <span class="unc">复现门槛</span> 单目尺度模糊、相机自运动污染、retarget 是否「伪标签」、每段视频 retarget 到几个本体——这些决定动作标签「有多对」的关键环节论文全是黑盒。消融证明即便标签不精确，<u>视觉-语义先验 + 粗粒度行为先验仍有效</u>（+6~18 点）。
+    </div>
+  </div>
+</section>
+
+<div class="flow-down" style="--accent:var(--amber)">
+  <svg viewBox="0 0 24 46"><line x1="12" y1="0" x2="12" y2="38" stroke="#f5a623" stroke-width="1.5" marker-end="url(#ar)"/></svg>
+  <span class="lbl" style="color:#caa86a">统一表示喂入双塔模型</span>
+</div>
+
+<!-- ============ PHASE 03 ARCHITECTURE ============ -->
+<section class="phase" style="--accent:#7c9cf0">
+  <div class="phase-head">
+    <div class="phase-num" style="-webkit-text-stroke-color:#7c9cf0">03</div>
+    <div class="phase-title">
+      <h2>模型架构</h2>
+      <span class="en">Dual-Tower · VLM + Perceiver-based Action Expert</span>
+      <p>典型「双塔解耦」结构（图 3）：语义理解与低层控制分离。VLM 给 Action Expert 提供「语义 + 几何上下文」，Action Expert 负责连续动作生成。</p>
+    </div>
+  </div>
+
+  <div class="arch">
+    <div class="tower" style="--c:#7c9cf0">
+      <div class="badge">Module A</div>
+      <h4>Pretrained VLM</h4>
+      <div class="sz">规模 4B · 视觉-语言理解</div>
+      <p>对多视角图像 + 语言指令做联合编码，输出空间接地的多模态表征 <small class="sym">z<sub>t</sub></small>，编码语义与几何上下文。</p>
+      <div class="chiprow">
+        <span class="chip">Vision Encoder</span><span class="chip">语言主干（自回归）</span><span class="chip">FAST 动作 token（词表扩展）</span>
+      </div>
+    </div>
+    <div class="tower" style="--c:var(--cyan)">
+      <div class="badge">Module B</div>
+      <h4>Action Expert</h4>
+      <div class="sz">规模 600M · Perceiver + Flow Matching</div>
+      <p>基于 Perceiver 的感知-动作专家，被建模为「条件速度场预测器」，从噪声去噪出连续动作 chunk。</p>
+      <div class="chiprow">
+        <span class="chip">Flow Matching</span><span class="chip">时序感知 Perceiver Block</span><span class="chip">AdaLN 时间条件</span><span class="chip">Future Tokens</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel accentbar" style="--accent:#7c9cf0;margin-top:18px">
+    <h3 class="blk"><span class="ix" style="color:#7c9cf0;border-color:#7c9cf0">IO</span> 模型输入 / 输出</h3>
+    <div class="grid g2">
+      <div class="iorow" style="--c:#7c9cf0">
+        <div class="lab">输入 Input</div>
+        <div class="val">多视角观测 <code>O_t</code> + 语言指令 <code>L</code> + 本体感知状态 <code>s_t</code></div>
+      </div>
+      <div class="iorow" style="--c:var(--cyan)">
+        <div class="lab">输出 Output</div>
+        <div class="val">文本 <code>ℓ</code>（子任务名，自回归生成）+ 连续动作 chunk <code>a_{t:t+H}</code>（flow-matching 生成）</div>
+      </div>
+    </div>
+    <p style="font-size:13px;color:var(--txt-dim);margin-top:12px">推理时<b>先生成高层语义子任务描述</b>，再在该子任务条件下生成动作 chunk（例：「Package the delivery」→「Put the medicine into the package」）。</p>
+  </div>
+
+  <div class="panel" style="margin-top:18px;border-color:var(--cyan)">
+    <h3 class="blk"><span class="ix">3.3</span> Action Expert 内部机制 · 逐式拆解</h3>
+
+    <h3 class="blk" style="font-size:15px;margin-top:8px;color:var(--cyan)">① Flow Matching：学「噪声 → 真实动作」路径上的速度</h3>
+    <div class="fml">
+      <div class="cap">线性插值路径（构造扰动动作）</div>
+      $$ \tilde{a}_{1:H}^{\,\tau,\epsilon}=\tau\, a_{1:H}+(1-\tau)\,\epsilon,\qquad \epsilon\sim\mathcal{N}(0,I),\;\tau\in[0,1] $$
+    </div>
+    <p style="font-size:13px;color:var(--txt-dim)"><code style="font-family:var(--mono);font-size:11.5px">τ=0</code> 纯噪声，<code style="font-family:var(--mono);font-size:11.5px">τ=1</code> 真实动作，速度沿路径为常数 <small class="sym">ε − a<sub>1:H</sub></small>。相比直接回归能学<b>多模态动作分布</b>（同一观测下多种合理动作不会被均值化）；相比 diffusion 路径更直、推理仅需 5–10 步。</p>
+
+    <h3 class="blk" style="font-size:15px;margin-top:22px;color:var(--cyan)">② 构造潜在序列（沿 token 维度拼接，非特征维度）</h3>
+    <div class="fml">
+      <div class="cap">第 0 层输入序列 a⁰（注意：是输入序列，不是动作本身）</div>
+      $$ a^{0}_{t:t+H}=\mathrm{Concat}\big(\underbrace{\phi_s(s_t)}_{\text{状态编码}},\;\underbrace{f_{\text{future}}}_{\text{未来占位 token}},\;\underbrace{\phi_a(\tilde{a}_{t:t+H},\tau)}_{\text{扰动动作+时间编码}}\big) $$
+    </div>
+    <div class="grid g3" style="margin-top:6px">
+      <div class="iorow" style="--c:var(--cyan)"><div class="lab">φ_s(s_t)</div><div class="val">状态编码器（小 MLP）把本体感知（关节角/末端位姿/夹爪）映射成 token —「机器人现在在哪」</div></div>
+      <div class="iorow" style="--c:var(--cyan)"><div class="lab">f_future</div><div class="val">可学习 query embedding，长度=<code>H</code>，未来动作步的显式占位符（类比 DETR object queries）</div></div>
+      <div class="iorow" style="--c:var(--cyan)"><div class="lab">φ_a(ã,τ)</div><div class="val">扰动动作 + 时间步 τ 编成 token —「当前噪声动作估计，请告诉我修正方向」</div></div>
+    </div>
+
+    <h3 class="blk" style="font-size:15px;margin-top:22px;color:var(--cyan)">③ 堆叠的时序感知 Perceiver Block（每层四步）</h3>
+    <p class="lead" style="margin-bottom:10px"><b>Perceiver：</b>用一组固定数量 latent token 做 query，cross-attend 长输入做 K/V，复杂度从 <small class="sym">O(N²)</small> 降到 <small class="sym">O(L·N), L≪N</small>。此处 latent = 上面拼出的序列；外部上下文 = VLM 表征 <small class="sym">z<sub>t</sub></small>（latent bottleneck 高效多模态融合）。</p>
+    <div class="steps">
+      <div class="step"><div class="n"></div><div class="c"><b>AdaLN 时间调制 VLM 表征</b><div class="d">$\tilde{z}_t=\mathrm{AdaLN}_z(z_t,\tau)$ — γ,β 由 τ 经小网络动态预测，不同去噪阶段以不同方式利用语义（DiT 成熟设计）。</div></div></div>
+      <div class="step"><div class="n"></div><div class="c"><b>残差注意力（self + cross 一体）</b><div class="d">$h'=h+\mathrm{MHA}(Q{=}h,\;K,V{=}[h;\tilde{z}_t])$ — K/V 是 latent 拼 VLM 表征：每个 token 同时 attend 其他 latent（动作内部时序依赖）与 VLM 表征（吸收视觉-语言上下文），一次注意力做完两件事。</div></div></div>
+      <div class="step"><div class="n"></div><div class="c"><b>残差 FFN 细化</b><div class="d">$h^{out}=h'+\mathrm{MLP}(h')$ — 对每个 token 独立非线性变换。</div></div></div>
+      <div class="step"><div class="n"></div><div class="c"><b>解码速度场</b><div class="d">$v^{out}_{t:t+H}=f_\theta(z_t,a^{0}_{t:t+H},\tau)$ — 从精炼后的 latent（future token 位置）投影出 H 个速度向量。</div></div></div>
+    </div>
+    <div class="good">
+      <b>「时序感知」指哪个时序？</b>
+      指 flow matching 的<b>去噪时间步 τ</b>（τ=0 噪声 → τ=1 真实动作），<u>不是</u>动作 chunk 内部「未来第 1/2/3 步」的物理时序。每层 Perceiver block 通过 AdaLN 注入 τ —— 这就是「时序感知」。多层堆叠从粗到细：粗对齐任务 → 高层推理动作大致方向 → 细化每步精确速度。
+    </div>
+  </div>
+</section>
+
+<div class="flow-down" style="--accent:#7c9cf0">
+  <svg viewBox="0 0 24 46"><line x1="12" y1="0" x2="12" y2="38" stroke="#7c9cf0" stroke-width="1.5" marker-end="url(#ar)"/></svg>
+  <span class="lbl" style="color:#9fb2e8">课程化三阶段训练</span>
+</div>
+
+<!-- ============ PHASE 04 TRAINING ============ -->
+<section class="phase" style="--accent:var(--cyan)">
+  <div class="phase-head">
+    <div class="phase-num">04</div>
+    <div class="phase-title">
+      <h2>训练流程：三阶段课程</h2>
+      <span class="en">Stage 1 VLM → Stage 2 VLA → Stage 3 Post-Training</span>
+      <p>按「先语义、再行为、最后专精」消化异构数据。各阶段输入 / 输出 / 数据来源 / 损失逐一标注。消融显示三阶段叠加比任一单阶段更优（90.48 vs ~87.x）。</p>
+    </div>
+  </div>
+
+  <!-- STAGE 1 -->
+  <div class="stage" style="--c:#7c9cf0">
+    <div class="top">
+      <span class="sn">STAGE 1</span>
+      <span class="tt">VLM Co-Pretraining</span>
+      <span class="goal">注入视觉理解、空间推理、长时规划、离散动作生成能力</span>
+    </div>
+    <div class="body">
+      <div class="iorow full" style="--c:#7c9cf0">
+        <div class="lab">训练数据来源（task-specific sampling ratios 混合）</div>
+        <div class="val">① General VQA（QA/caption/多轮对话，保通用视觉理解）｜② Embodied VQA（点/框/轨迹输出 + 任务分解，强空间推理 & 长时规划）｜③ 跨本体动作数据（真机+仿真，<b>FAST 离散化</b>形式预热）｜④ 人类视频（扩大视觉与动作分布覆盖）</div>
+      </div>
+      <div class="iorow" style="--c:#7c9cf0">
+        <div class="lab">输入 / 输出</div>
+        <div class="val">输入：图像/语言 token（标准自回归序列）｜输出：文本响应 + 离散 <code>FAST</code> 动作 token（<b>同一词表，共享 embedding</b>）</div>
+      </div>
+      <div class="iorow" style="--c:#7c9cf0">
+        <div class="lab">参数训练范围 <span class="unc">推断</span></div>
+        <div class="val">语言主干更新；vision encoder 极可能更新或轻量更新（论文称「保留视觉理解」）；Action Expert <b>尚未上线</b></div>
+      </div>
+      <div class="iorow full" style="--c:#7c9cf0">
+        <div class="lab">损失函数 — 标准自回归 NLL（loss mask 控制哪段算损失）</div>
+        <div class="val">
+          <div class="fml" style="--accent:#7c9cf0;margin:6px 0 0">
+            $$ \mathcal{L}_{\text{Stage1}}(\theta)=\mathbb{E}_{(x,y)\sim D}\Big[-\sum_{j=1}^{n-1} M_j \log p_\theta(y_{j+1}\mid x_{1:j})\Big] $$
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note" style="margin-top:14px">
+    <b>Loss Mask 如何「吸收」异构标签 — Stage 1 能统一训练的关键</b>
+    所有数据被拉平成「输入 token → 输出 token」一个序列；<small class="sym">M<sub>j</sub></small> 是 0/1 开关数组，决定每个位置的预测是否进损失。VQA：图像+问题 <small class="sym">M=0</small>、答案 <small class="sym">M=1</small>；动作数据：观测+指令 <small class="sym">M=0</small>、FAST token <small class="sym">M=1</small>。无论扔进什么数据，<u>都用同一个 NLL + 不同 mask</u>——差异全被 mask 吸收，正是 GPT 类模型能同时学 QA/续写/翻译的同一原因。
+  </div>
+
+  <div class="flow-down"><svg viewBox="0 0 24 30"><line x1="12" y1="0" x2="12" y2="22" stroke="#3a4a60" stroke-width="1.5" marker-end="url(#ar)"/></svg></div>
+
+  <!-- STAGE 2 -->
+  <div class="stage" style="--c:var(--cyan)">
+    <div class="top">
+      <span class="sn">STAGE 2</span>
+      <span class="tt">VLA Co-Pretraining</span>
+      <span class="goal">学习连续操作行为，同时保留 VLM 视觉-语义表征</span>
+    </div>
+    <div class="body">
+      <div class="iorow full" style="--c:var(--cyan)">
+        <div class="lab">训练数据来源（Action Expert 上线，引入 flow matching）</div>
+        <div class="val">General VQA + Embodied VQA（保基础能力）｜仿真机器人轨迹｜真机示范｜retarget 到下游本体的人类视频示范 —— <b>动作数据全部投影到统一动作空间</b>，保持异构来源对齐</div>
+      </div>
+      <div class="iorow" style="--c:var(--cyan)">
+        <div class="lab">输入 / 输出</div>
+        <div class="val">输入：多视图观测 + 语言 + 状态 + 扰动动作｜输出：文本（自回归）+ 连续动作速度场（flow matching）</div>
+      </div>
+      <div class="iorow" style="--c:var(--cyan)">
+        <div class="lab">参数训练范围 <span class="unc">推断</span></div>
+        <div class="val">VLM 与 Action Expert <b>均更新</b>，但 VLM 被 NLL 项「拽住」防漂移；vision encoder 是否冻结 / 是否 LoRA / 学习率分组，论文未说</div>
+      </div>
+      <div class="iorow full" style="--c:var(--cyan)">
+        <div class="lab">损失函数 — 自回归 NLL + Flow Matching MSE 联合（α 加权）</div>
+        <div class="val">
+          <div class="fml" style="margin:6px 0 0">
+            $$ \mathcal{L}_{\text{Stage2}}=\alpha\!\cdot\!\mathbb{E}\Big[-\!\sum_{j=1}^{n-1}\! M_j\log p_\theta(y_{j+1}|x_{1:j})\Big]+\mathbb{E}_{D,\epsilon,\tau}\big[\,\|\epsilon-a_{1:H}-f^a_\theta(\tilde{a}^{\tau,\epsilon}_{1:H})\|^2\big] $$
+          </div>
+          <div style="font-size:12px;color:var(--txt-faint);margin-top:8px">第一项：保持文本/离散动作自回归能力（=保护 VLM 表征不被腐蚀）｜第二项：训练 <small class="sym">f<sup>a</sup><sub>θ</sub></small> 预测 flow <small class="sym">ε−a<sub>1:H</sub></small></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="flow-down"><svg viewBox="0 0 24 30"><line x1="12" y1="0" x2="12" y2="22" stroke="#3a4a60" stroke-width="1.5" marker-end="url(#ar)"/></svg></div>
+
+  <!-- STAGE 3 -->
+  <div class="stage" style="--c:var(--amber)">
+    <div class="top">
+      <span class="sn">STAGE 3</span>
+      <span class="tt">VLA Post-Training（目标机器人）</span>
+      <span class="goal">在目标部署本体上轻量专精，提升下游成功率</span>
+    </div>
+    <div class="body">
+      <div class="iorow full" style="--c:var(--amber)">
+        <div class="lab">训练数据来源</div>
+        <div class="val"><b>仅</b>目标机器人本体采集的数据（或目标仿真 benchmark 生成数据），记为 <code>D_target</code></div>
+      </div>
+      <div class="iorow" style="--c:var(--amber)">
+        <div class="lab">关键设计</div>
+        <div class="val"><b>丢弃辅助自回归目标</b>，只保留 flow matching 损失 — 接受 VLM 表征因专精而更专门化，用通用性换性能</div>
+      </div>
+      <div class="iorow" style="--c:var(--amber)">
+        <div class="lab">参数训练范围 <span class="confirmed">论文明确</span></div>
+        <div class="val"><b>all parameters end-to-end</b> — VLM 与 Action Expert 联合微调，视觉-运动表征与动作生成共同适配目标任务</div>
+      </div>
+      <div class="iorow full" style="--c:var(--amber)">
+        <div class="lab">损失函数 — 仅 Flow Matching</div>
+        <div class="val">
+          <div class="fml" style="--accent:var(--amber);margin:6px 0 0">
+            $$ \mathcal{L}_{\text{Post}}(\theta)=\mathbb{E}_{D_{\text{target}},\epsilon,\tau}\big[\,\|\epsilon-a_{1:H}-f^a_\theta(\tilde{a}^{\tau,\epsilon}_{1:H})\|^2\big] $$
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="good" style="margin-top:16px">
+    <b>三阶段冻结/端到端 — 唯一被明说的是 Stage 3</b>
+    论文仅在 Stage 3 强调「all model parameters updated end-to-end」。Stage 1/2 训练范围未明说，但从损失设计反推（Stage 2 保留 NLL 项「保护 VLM」）——最可能是 VLM + Action Expert 均更新、双损失加权平衡。vision encoder 是否冻结、是否 LoRA、warmup 等是 VLA 论文常见「披露不全」。
+  </div>
+</section>
+
+<div class="flow-down" style="--accent:var(--amber)">
+  <svg viewBox="0 0 24 46"><line x1="12" y1="0" x2="12" y2="38" stroke="#f5a623" stroke-width="1.5" marker-end="url(#ar)"/></svg>
+  <span class="lbl" style="color:#caa86a">训练好的策略部署到目标机器人</span>
+</div>
+
+<!-- ============ PHASE 05 INFERENCE ============ -->
+<section class="phase" style="--accent:var(--real)">
+  <div class="phase-head">
+    <div class="phase-num" style="-webkit-text-stroke-color:var(--real)">05</div>
+    <div class="phase-title">
+      <h2>推理与部署</h2>
+      <span class="en">Inference Chain — 从观测到底层控制</span>
+      <p>实时控制的完整链路：VLM 编码 → 自回归生成子任务 → Action Expert flow-matching 去噪 → 掩码取本体自由度 → 6-DoF 转回机器人系下发控制器。</p>
+    </div>
+  </div>
+
+  <div class="panel accentbar" style="--accent:var(--real)">
+    <div class="grid g3" style="margin-bottom:18px">
+      <div class="iorow" style="--c:var(--real)"><div class="lab">输入侧 Input</div><div class="val">多视角观测 <code>O_t</code>（图像）+ 语言指令 <code>L</code>（human prompt）+ 本体感知 <code>s_t</code>（关节/末端状态）</div></div>
+      <div class="iorow" style="--c:var(--real)"><div class="lab">中间产物</div><div class="val">VLM 表征 <code>z_t</code> + 高层子任务文本 <code>ℓ</code>（自回归生成）</div></div>
+      <div class="iorow" style="--c:var(--real)"><div class="lab">输出侧 Output</div><div class="val">相机系 / 统一空间下的连续动作 chunk <code>a_{t:t+H}</code></div></div>
+    </div>
+
+    <h3 class="blk" style="--accent:var(--real);font-size:16px"><span class="ix" style="color:var(--real);border-color:var(--real)">FLOW</span> 处理流程</h3>
+    <div class="steps">
+      <div class="step"><div class="n"></div><div class="c"><b>VLM 联合编码</b><div class="d">对图像 + 指令编码，输出多模态表征 <small class="sym">z<sub>t</sub></small>。整个去噪迭代中 <u>z<sub>t</sub> 只算一次并缓存</u>，是实时控制的关键。</div></div></div>
+      <div class="step"><div class="n"></div><div class="c"><b>自回归生成高层子任务 ℓ</b><div class="d">例：「Package the delivery」→ 分解为「Put the medicine into the package」。</div></div></div>
+      <div class="step"><div class="n"></div><div class="c"><b>子任务 + z_t 作为上下文传给 Action Expert</b><div class="d">语义条件注入动作生成。</div></div></div>
+      <div class="step"><div class="n"></div><div class="c"><b>Flow-Matching 逆过程去噪（ODE 积分）</b><div class="d">从高斯噪声 ε 起步，按学到的速度场 <small class="sym">v<sup>out</sup>=f<sub>θ</sub>(z<sub>t</sub>,a⁰,τ)</small> 逐步积分到 τ=1，得干净动作 chunk。常 5–10 步（欧拉法）。</div></div></div>
+      <div class="step"><div class="n"></div><div class="c"><b>掩码取本体自由度</b><div class="d">用与训练一致的动作维度掩码，从统一向量取出当前本体真实存在的自由度。</div></div></div>
+      <div class="step"><div class="n"></div><div class="c"><b>坐标转换 + 下发控制器</b><div class="d">6-DoF 末端动作（3 平移 + 3 轴角）转回机器人坐标系，下发底层控制器。</div></div></div>
+    </div>
+
+    <div class="fml" style="--accent:var(--real)">
+      <div class="cap">推理一步（欧拉法 · 简化伪代码）</div>
+      <pre style="font-family:var(--mono);font-size:12.5px;color:var(--txt-dim);margin:0;line-height:1.7"><span style="color:var(--real)">a ← ε</span>                                  <span style="color:var(--txt-faint)"># 从纯噪声起步</span>
+<span style="color:var(--real)">for</span> τ = 0, Δτ, 2Δτ, ..., 1:
+    h⁰ ← Concat(φ_s(s_t), f_future, φ_a(a, τ))
+    v  ← Action_Expert(h⁰, z_t, τ)        <span style="color:var(--txt-faint)"># z_t 缓存复用</span>
+    a  ← a + Δτ · v                       <span style="color:var(--txt-faint)"># 沿速度场积分一步</span>
+<span style="color:var(--real)">return</span> a                                 <span style="color:var(--txt-faint)"># 预测的动作 chunk</span></pre>
+    </div>
+
+    <div class="good" style="margin-top:14px">
+      <b>动作 chunk 模式的好处</b>
+      每次推理一次性产出未来 <small class="sym">H</small> 步（如 16 步），提高时间一致性、降低推理频率压力。整个 chunk 视作「chunk 起始帧相机系」下的局部惯性表达——这是单 chunk 时长内（几百 ms）相机变化有限的工程妥协，配合控制器反馈与每步重观测，累积误差不会无限放大。
+    </div>
+  </div>
+</section>
+
+<div class="foot">
+  <b># PIPELINE SUMMARY</b><br>
+  四源异构数据（网页 12% · 人类 33% · 仿真 24% · 真机 31%）<b>→</b> 统一动作空间（相机系 6-DoF + 定长向量 + 掩码）<b>→</b> VLM 4B + Perceiver Action Expert 600M 双塔<b>→</b> 三阶段课程（VLM 自回归 → VLA 自回归+flow matching → Post-Training 仅 flow matching）<b>→</b> 推理：VLM编码→自回归子任务→flow-matching ODE去噪→掩码+坐标转换→控制器。<br><br>
+  <b># 标注约定</b>　实线徽标=论文明确陈述或公式确证；<span style="color:var(--warn)">虚线「推断」徽标</span>=论文未披露、依据 VLA 通用工程实践与历史讨论补充（vision encoder 冻结、retarget 算法、动作标签物理细节、相机自运动处理等均属论文黑盒）。<br>
+  <b># 来源</b>　JoyAI-RA 0.1, arXiv:2604.20100v2 · 图 1–8 / Table 1–5 / Appendix A–C，并结合多轮技术讨论。
+</div>
+
+</div>
+
+<script>
+window.addEventListener('DOMContentLoaded',function(){
+  if(window.renderMathInElement){
+    renderMathInElement(document.body,{
+      delimiters:[
+        {left:'$$',right:'$$',display:true},
+        {left:'$',right:'$',display:false}
+      ],
+      throwOnError:false,
+      strict:false
+    });
+  }
+});
+</script>
+</body>
+</html>

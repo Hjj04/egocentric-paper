@@ -3,51 +3,163 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Egocentric Paper · Pipeline 拆解合集</title>
+<title>Egocentric & VLA Paper Pipelines · 流程拆解合集</title>
 <style>
-  :root { --bg:#0d1117; --card:#161b22; --border:#30363d; --fg:#e6edf3; --muted:#8b949e; --accent:#58a6ff; }
-  * { box-sizing: border-box; }
+  :root { --bg:#0d1117; --card:#161b22; --card2:#1c2330; --border:#30363d; --fg:#e6edf3;
+          --muted:#8b949e; --accent:#58a6ff; --green:#3fb950; --amber:#d29922; --gray:#6e7681; }
+  * { box-sizing:border-box; }
   body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
-         background:var(--bg); color:var(--fg); line-height:1.6; }
-  .wrap { max-width:880px; margin:0 auto; padding:48px 20px 80px; }
-  header { margin-bottom:40px; }
-  h1 { font-size:30px; margin:0 0 8px; }
-  .sub { color:var(--muted); font-size:15px; }
-  .grid { display:grid; gap:16px; }
-  a.card { display:block; text-decoration:none; background:var(--card); border:1px solid var(--border);
-           border-radius:12px; padding:20px 22px; transition:border-color .15s, transform .15s; }
-  a.card:hover { border-color:var(--accent); transform:translateY(-2px); }
-  .card h2 { margin:0 0 6px; font-size:18px; color:var(--fg); }
-  .card p { margin:0; color:var(--muted); font-size:14px; }
-  .tag { display:inline-block; font-size:12px; color:var(--accent); border:1px solid var(--border);
-         border-radius:999px; padding:2px 10px; margin-bottom:10px; }
-  footer { margin-top:48px; color:var(--muted); font-size:13px; text-align:center; }
+         background:var(--bg); color:var(--fg); line-height:1.65; }
+  .wrap { max-width:920px; margin:0 auto; padding:48px 20px 96px; }
+  header.top { margin-bottom:14px; }
+  h1 { font-size:30px; margin:0 0 10px; letter-spacing:.2px; }
+  .lede { color:var(--muted); font-size:15px; margin:0; }
+  .lede code { background:var(--card2); padding:1px 6px; border-radius:5px; font-size:13px; }
+  .divider { height:1px; background:var(--border); margin:28px 0 24px; border:0; }
+  .count { color:var(--muted); font-size:13px; margin-bottom:20px; }
+  article.card { background:var(--card); border:1px solid var(--border); border-radius:14px;
+                 padding:22px 24px; margin-bottom:20px; }
+  .card-head { display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+  .card-head h2 { margin:0; font-size:21px; }
+  .date { color:var(--muted); font-size:13px; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .meta { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0 14px; }
+  .badge { font-size:12px; padding:2px 10px; border-radius:999px; border:1px solid var(--border); }
+  .b-open { color:var(--green); border-color:rgba(63,185,80,.4); }
+  .b-closed { color:var(--gray); }
+  .b-anon { color:var(--amber); border-color:rgba(210,153,34,.4); }
+  .b-org { color:var(--accent); border-color:rgba(88,166,255,.4); }
+  .meta a { color:var(--accent); text-decoration:none; font-size:12px; padding:2px 10px;
+            border:1px solid rgba(88,166,255,.35); border-radius:999px; }
+  .meta a:hover { background:rgba(88,166,255,.1); }
+  .tldr { margin:0 0 14px; font-size:15px; }
+  .tldr b { color:var(--fg); }
+  .sec h3 { font-size:13px; text-transform:uppercase; letter-spacing:.6px; color:var(--muted);
+            margin:16px 0 8px; }
+  .sec ul { margin:0; padding-left:20px; }
+  .sec li { margin:6px 0; font-size:14.5px; }
+  .tag { display:inline-block; font-size:11px; font-weight:600; color:var(--accent);
+         background:rgba(88,166,255,.12); border-radius:4px; padding:0 6px; margin-right:4px; }
+  .note { margin-top:14px; font-size:13.5px; color:var(--muted); border-left:2px solid var(--border);
+          padding:2px 0 2px 12px; }
+  .metric { margin-top:12px; font-size:13.5px; color:var(--green); }
+  .view { display:inline-block; margin-top:16px; font-size:14px; color:var(--accent);
+          text-decoration:none; font-weight:600; }
+  .view:hover { text-decoration:underline; }
+  footer { margin-top:40px; color:var(--muted); font-size:13px; text-align:center; line-height:1.8; }
+  footer a { color:var(--accent); text-decoration:none; }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <header>
-    <h1>Egocentric Paper · Pipeline 拆解合集</h1>
-    <div class="sub">数据 → 处理 → 训练 → 推理 的完整流程逐层解析</div>
+  <header class="top">
+    <h1>Egocentric &amp; VLA Paper Pipelines</h1>
+    <p class="lede">围绕第一人称（egocentric）人类视频与 Vision-Language-Action（VLA）策略学习的代表性工作，逐篇给出从 <code>数据 → 处理 → 训练 → 推理</code> 的完整流程拆解。本仓库持续更新，新增工作将随时收录。</p>
   </header>
-  <div class="grid">
-    <a class="card" href="DreamDojo_pipeline.html">
-      <span class="tag">Pipeline</span>
-      <h2>DreamDojo</h2>
-      <p>完整流程拆解 · 数据 / 处理 / 训练 / 推理</p>
-    </a>
-    <a class="card" href="donk-pipeline.html">
-      <span class="tag">Pipeline</span>
-      <h2>Donk</h2>
-      <p>全流程逐层解析 · 数据 → 处理 → 训练 → 推理</p>
-    </a>
-    <a class="card" href="HARP-VLA-pipeline.html">
-      <span class="tag">Pipeline</span>
-      <h2>HARP-VLA</h2>
-      <p>完整流程拆解</p>
-    </a>
-  </div>
-  <footer>由 GitHub Pages 托管 · 静态页面合集</footer>
+  <hr class="divider">
+  <div class="count">按发布时间倒序排列，越新的工作排在越前 · 当前收录 5 篇</div>
+  <article class="card">
+    <div class="card-head"><h2>Donk</h2><span class="date">2026-06-02</span></div>
+    <div class="meta">
+      <span class="badge b-closed">未开源</span>
+    </div>
+    <p class="tldr"><b>同一个"视频-动作联合去噪器"：给定观测图像时它是灵巧手动作策略，不给图像时它是数据引擎。</b></p>
+    <div class="sec">
+      <h3>核心思路</h3>
+      <ul>
+        <li><span class="tag">架构</span>视频与动作联合去噪，用单一模型统一建模感知与动作生成。</li>
+        <li><span class="tag">角色一</span>作为动作策略：从图像 + 语言预测未来双手 MANO 轨迹。</li>
+        <li><span class="tag">角色二</span>作为数据引擎：仅凭文本生成成对的"交互视频 + 同步手部动作"，把廉价的人类视频先验转化为动作对齐的机器人训练数据。</li>
+        <li><span class="tag">动机</span>真实遥操作数据昂贵且稀缺，需用生成数据补足。</li>
+      </ul>
+    </div>
+    <div class="note">局限：实验未包含真机验证。</div>
+    <a class="view" href="donk-pipeline.html">查看完整流程拆解 →</a>
+  </article>
+
+  <article class="card">
+    <div class="card-head"><h2>HARP-VLA</h2><span class="date">2026-05-29</span></div>
+    <div class="meta">
+      <span class="badge b-anon">匿名提交</span>
+      <a href="https://github.com/anonymity35/DreamDojo" target="_blank" rel="noopener">匿名代码仓库</a>
+    </div>
+    <p class="tldr"><b>从大规模无动作标签的人类操作视频中预训练可泛化的 VLA 策略，核心是同时缩小"视觉表征 gap"与"动作执行 gap"。</b>以表征对齐的训练策略（损失设计 + 三阶段训练范式）为主，辅以一个小架构模块和一条数据处理 pipeline。</p>
+    <div class="sec">
+      <h3>核心贡献</h3>
+      <ul>
+        <li><span class="tag">损失</span>新的对齐损失——源相对 + 配对判别损失：不强迫机器人特征塌缩到某个绝对距离，只要求 adapted 机器人特征相对冻结特征更靠近其配对的人类特征。</li>
+        <li><span class="tag">训练</span>把"潜动作学习"与"人机视觉对齐"耦合进同一个 Stage-1，构成三阶段训练范式。</li>
+        <li><span class="tag">架构</span>一个 robot-only adapter——唯一的架构贡献。</li>
+      </ul>
+    </div>
+    <a class="view" href="HARP-VLA-pipeline.html">查看完整流程拆解 →</a>
+  </article>
+
+  <article class="card">
+    <div class="card-head"><h2>HumanEgo</h2><span class="date">2026-05-28</span></div>
+    <div class="meta">
+      <span class="badge b-open">已开源</span>
+      <span class="badge b-org">马里兰大学</span>
+      <span class="badge">★ 234</span>
+      <a href="https://humanego-ai.github.io/" target="_blank" rel="noopener">项目主页</a>
+      <a href="https://github.com/TX-Leo/HumanEgo" target="_blank" rel="noopener">GitHub</a>
+    </div>
+    <p class="tldr"><b>从几分钟的人类第一视角视频（Aria 眼镜采集）直接学出可部署的双臂操作策略——不用任何机器人数据、不做大规模预训练，且可 zero-shot 迁移到真机（换机器人 / 相机 / 环境均无需重训或微调）。</b></p>
+    <div class="sec">
+      <h3>核心贡献</h3>
+      <ul>
+        <li><span class="tag">表征</span><b>Interaction-Centric Token (ICT)</b>：把每只手、每个物体都当作一个 entity，将其 6-DoF 位姿编码成 29 维 token。关键在于用 entity 自身的局部坐标系（而非相机系或绝对坐标）表达左右手位姿，使 token 直接反映"接近 / 抓取 / 搬运"的交互状态，并对视角、本体、环境天然不变——这是人到机器人 zero-shot 迁移的真正开关（消融：原始 RGB 上加 ICT，成功率 7.5% → 85%）。</li>
+        <li><span class="tag">训练</span>flow matching 动作生成 + 三个 dense 前向动力学辅助目标（物体未来 6-DoF 轨迹 / 未来 2D 投影轨迹 / K 步后的 ICT 隐状态），标签全部由感知管线自动产生；专门解决"数据极少"的问题，低数据区收益最大（8 分钟 57.5% vs 无辅助 37.5%）。</li>
+        <li><span class="tag">预处理</span>用 SAM2 + LaMa 抹除人手人臂并原位渲染虚拟平行夹爪与物体关键点，得到本体无关的视觉观测。（作者消融表明此步为次要——决定性的是 ICT 这一显式空间表征，而非视觉保真度。）</li>
+      </ul>
+    </div>
+    <div class="note">定位：非数据集贡献，本质是"新表征（ICT）+ 数据高效训练方法"组成的 robot-data-free 迁移 pipeline。</div>
+    <div class="metric">效果：30 分钟人类视频在 4 个真实任务上平均 92.5%，15 分钟 75%；同等采集时间下比遥操作基线 ACT 高 41%。</div>
+    <a class="view" href="humanego_pipeline.html">查看完整流程拆解 →</a>
+  </article>
+  <article class="card">
+    <div class="card-head"><h2>JoyAI-RA 0.1</h2><span class="date">2026-04-23</span></div>
+    <div class="meta">
+      <span class="badge b-closed">未开源</span>
+      <a href="https://joyai-ra.github.io/" target="_blank" rel="noopener">项目主页</a>
+    </div>
+    <p class="tldr"><b>围绕 egocentric 人类视频构建统一动作空间与 Action Expert 的 VLA 系统，强调数据语义宽度与一组定量化消融。</b></p>
+    <div class="sec">
+      <h3>独有贡献</h3>
+      <ul>
+        <li><span class="tag">数据</span>EgoLive 数据集本身的语义宽度与标注粒度。</li>
+        <li><span class="tag">算法</span>基于相机系 6-DoF 的统一动作空间的具体工程实现。</li>
+        <li><span class="tag">算法</span>Perceiver + AdaLN 时序条件 + future tokens 在 Action Expert 上的具体组合。</li>
+        <li><span class="tag">实验</span>一组定量化消融，回答了"人类视频规模化、in-domain 对齐、EgoLive vs EgoDex、仿真数据贡献度"等此前没有清晰答案的问题。</li>
+      </ul>
+    </div>
+    <a class="view" href="joyai-ra-pipeline.html">查看完整流程拆解 →</a>
+  </article>
+
+  <article class="card">
+    <div class="card-head"><h2>DreamDojo</h2><span class="date">2026-02-06</span></div>
+    <div class="meta">
+      <span class="badge b-open">已开源</span>
+      <span class="badge b-org">NVIDIA</span>
+      <span class="badge">★ 913</span>
+      <a href="https://dreamdojo-world.github.io/" target="_blank" rel="noopener">项目主页</a>
+      <a href="https://github.com/NVIDIA/DreamDojo" target="_blank" rel="noopener">GitHub</a>
+    </div>
+    <p class="tldr"><b>数据规模 + 用 latent action 打通"人类视频 → 机器人世界模型（world model）"的训练配方。</b></p>
+    <div class="sec">
+      <h3>核心思路</h3>
+      <ul>
+        <li><span class="tag">数据</span>使用 44k 小时人类第一人称视频。</li>
+        <li><span class="tag">训练</span>以"连续潜动作作为统一动作"的方法，把人类交互知识灌进一个基于 Cosmos-Predict2.5 的视频世界模型。</li>
+        <li><span class="tag">推理</span>在小规模目标机器人数据上微调后，可对未见物体 / 环境做物理合理、动作可控的实时模拟。</li>
+      </ul>
+    </div>
+    <div class="metric">影响力：已获得接近 1k（★ 913）的 star，参考价值较高。</div>
+    <a class="view" href="DreamDojo_pipeline.html">查看完整流程拆解 →</a>
+  </article>
+  <footer>
+    本页由 GitHub Pages 托管 · 仓库 <a href="https://github.com/Hjj04/egocentric-paper">Hjj04/egocentric-paper</a><br>
+    各论文流程图均为自包含静态页面，点击卡片内链接查看。
+  </footer>
 </div>
 </body>
 </html>

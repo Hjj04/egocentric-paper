@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HumanEgo · 完整 Pipeline 蓝图</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;700;900&family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0a0e15;
+    --bg-2:#0e131c;
+    --card:#121925;
+    --card-2:#0f1622;
+    --ink:#e7eef6;
+    --dim:#9bacbf;
+    --faint:#6a7a8d;
+    --line:rgba(255,255,255,.10);
+    --line-soft:rgba(255,255,255,.055);
+
+    --azure:#6aa9ff;     /* stage 1 */
+    --teal:#3ad6c4;      /* stage 2 / spatial */
+    --amber:#f5a623;     /* visual branch */
+    --indigo:#9aa6ff;    /* stage 3 */
+    --gold:#e3bd4d;      /* stage 4 */
+    --coral:#ff7a59;     /* stage 5 */
+    --green:#57b87f;     /* fact */
+    --rose:#ff8aa6;      /* inference */
+
+    --mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;
+    --disp:'Archivo','Noto Sans SC',sans-serif;
+    --body:'Noto Sans SC','Archivo',-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--body);
+    line-height:1.62;
+    -webkit-font-smoothing:antialiased;
+    position:relative;
+    overflow-x:hidden;
+  }
+  /* blueprint grid + vignette */
+  body::before{
+    content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+    background-image:
+      linear-gradient(var(--line-soft) 1px,transparent 1px),
+      linear-gradient(90deg,var(--line-soft) 1px,transparent 1px);
+    background-size:38px 38px;
+    mask-image:radial-gradient(ellipse 120% 90% at 50% 0%,#000 30%,transparent 90%);
+  }
+  body::after{
+    content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+    background:radial-gradient(ellipse 80% 60% at 80% -10%,rgba(106,169,255,.10),transparent 60%),
+               radial-gradient(ellipse 70% 50% at 0% 110%,rgba(255,122,89,.07),transparent 60%);
+  }
+  .wrap{position:relative;z-index:1;max-width:1180px;margin:0 auto;padding:54px 26px 90px}
+
+  /* ===== Header ===== */
+  header{margin-bottom:46px}
+  .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.32em;color:var(--teal);text-transform:uppercase;margin-bottom:16px}
+  h1{font-family:var(--disp);font-weight:900;font-size:clamp(34px,6vw,62px);line-height:.98;letter-spacing:-.02em;margin-bottom:8px}
+  h1 .sub{display:block;font-size:clamp(15px,2.4vw,22px);font-weight:600;color:var(--dim);letter-spacing:0;margin-top:14px;line-height:1.4}
+  .lede{max-width:760px;color:var(--dim);font-size:15px;margin-top:18px}
+  .paper-tag{font-family:var(--mono);font-size:11.5px;color:var(--faint);margin-top:14px}
+
+  /* legend bar */
+  .legend{
+    display:flex;flex-wrap:wrap;gap:10px 22px;align-items:center;
+    margin-top:30px;padding:16px 20px;border:1px solid var(--line);border-radius:12px;
+    background:linear-gradient(180deg,rgba(255,255,255,.025),transparent);
+  }
+  .legend .grp{display:flex;align-items:center;gap:9px;font-size:12.5px;color:var(--dim)}
+  .legend .sw{width:26px;height:13px;border-radius:3px;flex:none}
+  .sw.fact{background:rgba(87,184,127,.18);border:1px solid var(--green)}
+  .sw.inf{background:rgba(255,138,166,.10);border:1px dashed var(--rose)}
+  .sw.vis{background:var(--amber)}
+  .sw.spa{background:var(--teal)}
+  .legend .div{width:1px;height:22px;background:var(--line)}
+  .toggle{
+    margin-left:auto;display:inline-flex;align-items:center;gap:10px;cursor:pointer;
+    font-family:var(--mono);font-size:11.5px;color:var(--dim);user-select:none;
+    border:1px solid var(--line);padding:8px 13px;border-radius:9px;transition:.2s;
+  }
+  .toggle:hover{border-color:var(--rose);color:var(--ink)}
+  .toggle .dot{width:10px;height:10px;border-radius:50%;background:var(--rose);box-shadow:0 0 8px var(--rose);transition:.2s}
+  body.hide-inf .toggle .dot{background:#3a4350;box-shadow:none}
+  body.hide-inf .card.inf{opacity:.16;filter:saturate(.2)}
+
+  /* ===== Stage scaffold ===== */
+  .stage{margin-top:14px;opacity:0;transform:translateY(26px);transition:opacity .7s,transform .7s}
+  .stage.in{opacity:1;transform:none}
+  .stage-head{display:flex;align-items:flex-start;gap:18px;margin-bottom:22px;padding-top:14px}
+  .snum{
+    font-family:var(--disp);font-weight:900;font-size:46px;line-height:.8;
+    width:78px;flex:none;letter-spacing:-.03em;
+    -webkit-text-stroke:1.4px var(--acc);color:transparent;
+  }
+  .stitle{flex:1}
+  .skick{font-family:var(--mono);font-size:11px;letter-spacing:.26em;color:var(--acc);text-transform:uppercase}
+  .stage-head h2{font-family:var(--disp);font-weight:700;font-size:25px;margin-top:5px;letter-spacing:-.01em}
+  .stage-head p{color:var(--faint);font-size:13.5px;max-width:720px;margin-top:5px}
+  .accbar{height:2px;background:linear-gradient(90deg,var(--acc),transparent);margin-bottom:24px;border-radius:2px}
+
+  /* stage accents */
+  .s1{--acc:var(--azure)} .s2{--acc:var(--teal)} .s3{--acc:var(--indigo)}
+  .s4{--acc:var(--gold)} .s5{--acc:var(--coral)}
+
+  .grid{display:grid;gap:16px}
+  .g2{grid-template-columns:1fr 1fr}
+  .g3{grid-template-columns:1fr 1fr 1fr}
+  @media(max-width:780px){.g2,.g3{grid-template-columns:1fr}.snum{font-size:36px;width:56px}}
+
+  /* ===== Card ===== */
+  .card{
+    position:relative;background:var(--card);border:1px solid var(--line);border-radius:13px;
+    padding:18px 19px 17px;transition:transform .25s,border-color .25s,box-shadow .25s;
+  }
+  .card::before{ /* corner tick */
+    content:"";position:absolute;top:10px;right:10px;width:9px;height:9px;
+    border-top:1.5px solid var(--acc);border-right:1.5px solid var(--acc);opacity:.5;
+  }
+  .card:hover{transform:translateY(-3px);border-color:var(--acc);box-shadow:0 14px 34px -20px var(--acc)}
+  .card.inf{border-style:dashed;border-color:rgba(255,138,166,.42);background:var(--card-2)}
+  .card.inf::before{border-color:var(--rose)}
+  .card .ck{font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;color:var(--faint);text-transform:uppercase;display:block;margin-bottom:7px}
+  .card h3{font-family:var(--disp);font-weight:700;font-size:16.5px;margin-bottom:9px;letter-spacing:-.005em;display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+  .card p{font-size:13.4px;color:var(--dim);margin-bottom:9px}
+  .card p:last-child{margin-bottom:0}
+  .card strong{color:var(--ink);font-weight:700}
+  .card .em{color:var(--acc);font-weight:700}
+
+  /* badges */
+  .b{font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;padding:2px 7px;border-radius:5px;font-weight:600;text-transform:uppercase;white-space:nowrap}
+  .b.fact{color:var(--green);background:rgba(87,184,127,.13);border:1px solid rgba(87,184,127,.5)}
+  .b.inf{color:var(--rose);background:rgba(255,138,166,.09);border:1px dashed rgba(255,138,166,.6)}
+  .b.vis{color:var(--amber);background:rgba(245,166,35,.12);border:1px solid rgba(245,166,35,.45)}
+  .b.spa{color:var(--teal);background:rgba(58,214,196,.12);border:1px solid rgba(58,214,196,.45)}
+
+  /* chips (tensor / params) */
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+  .chip{font-family:var(--mono);font-size:11px;color:var(--dim);background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:6px;padding:3px 8px}
+  .chip b{color:var(--ink);font-weight:600}
+  .chip.acc{color:var(--acc);border-color:color-mix(in srgb,var(--acc) 45%,transparent)}
+
+  /* formula block */
+  .fx{font-family:var(--mono);font-size:11.7px;line-height:1.7;color:var(--ink);background:rgba(0,0,0,.34);
+      border:1px solid var(--line);border-left:2px solid var(--acc);border-radius:7px;padding:10px 12px;margin-top:10px;overflow-x:auto;white-space:pre}
+  .fx .c{color:var(--faint)}
+  .fx .k{color:var(--acc)}
+
+  /* io tag (input/output mini-labels) */
+  .io{display:flex;gap:8px;flex-wrap:wrap;margin:11px 0 4px}
+  .io .pill{font-family:var(--mono);font-size:10.5px;border-radius:6px;padding:4px 9px;border:1px solid var(--line)}
+  .io .in{color:#9fd0ff;border-color:rgba(106,169,255,.4);background:rgba(106,169,255,.07)}
+  .io .out{color:#ffd29f;border-color:rgba(255,122,89,.4);background:rgba(255,122,89,.07)}
+
+  /* flow connector between stages */
+  .flow{display:flex;flex-direction:column;align-items:center;gap:5px;padding:20px 0 6px}
+  .flow .line{width:2px;height:30px;background:linear-gradient(var(--line),rgba(255,255,255,.32))}
+  .flow .chev{width:11px;height:11px;border-right:2px solid var(--dim);border-bottom:2px solid var(--dim);transform:rotate(45deg);margin-top:-7px}
+  .flow .lbl{font-family:var(--mono);font-size:10.5px;color:var(--faint);letter-spacing:.14em;text-transform:uppercase}
+
+  /* branch header (stage 2) */
+  .branchhead{display:flex;align-items:center;gap:10px;margin:4px 0 12px;font-family:var(--disp);font-weight:700;font-size:14px}
+  .branchhead .tag{font-family:var(--mono);font-size:10px;letter-spacing:.1em;padding:3px 9px;border-radius:6px}
+  .branchhead.vis .tag{color:var(--amber);border:1px solid var(--amber)}
+  .branchhead.spa .tag{color:var(--teal);border:1px solid var(--teal)}
+  .branchhead .ln{flex:1;height:1px;background:var(--line)}
+
+  /* merge node */
+  .merge{display:flex;justify-content:center;margin:6px 0 2px}
+  .merge .node{
+    font-family:var(--mono);font-size:11.5px;color:var(--bg);font-weight:600;letter-spacing:.06em;
+    background:linear-gradient(135deg,var(--amber),var(--teal));padding:9px 18px;border-radius:9px;
+    box-shadow:0 8px 24px -10px var(--teal);
+  }
+
+  /* sub-step list inside a card (motion opt etc.) */
+  .steps{counter-reset:s;margin-top:6px}
+  .steps .st{position:relative;padding:8px 0 8px 34px;border-top:1px solid var(--line-soft);font-size:13px;color:var(--dim)}
+  .steps .st:first-child{border-top:none}
+  .steps .st::before{counter-increment:s;content:counter(s);position:absolute;left:0;top:7px;
+    width:21px;height:21px;border-radius:6px;border:1px solid var(--acc);color:var(--acc);
+    font-family:var(--mono);font-size:11px;display:grid;place-items:center;font-weight:600}
+  .steps .st b{color:var(--ink)}
+
+  /* sensor table */
+  .sensors{margin-top:6px;border:1px solid var(--line);border-radius:9px;overflow:hidden}
+  .sensors .row{display:grid;grid-template-columns:128px 1fr;font-size:12.6px;border-top:1px solid var(--line-soft)}
+  .sensors .row:first-child{border-top:none}
+  .sensors .row .k{font-family:var(--mono);color:var(--azure);padding:8px 11px;background:rgba(106,169,255,.05);border-right:1px solid var(--line-soft);font-size:11.5px}
+  .sensors .row .v{padding:8px 11px;color:var(--dim)}
+  .sensors .row.note .k{color:var(--rose)}
+
+  /* footer caveats */
+  .caveats{margin-top:44px;border:1px solid var(--line);border-radius:13px;padding:22px 24px;background:linear-gradient(180deg,rgba(255,138,166,.05),transparent)}
+  .caveats h4{font-family:var(--disp);font-weight:700;font-size:15px;margin-bottom:13px;color:var(--rose);display:flex;align-items:center;gap:9px}
+  .caveats ul{list-style:none}
+  .caveats li{position:relative;padding:7px 0 7px 20px;font-size:13px;color:var(--dim);border-top:1px solid var(--line-soft)}
+  .caveats li:first-child{border-top:none}
+  .caveats li::before{content:"▸";position:absolute;left:0;color:var(--rose)}
+  .caveats li b{color:var(--ink)}
+  footer{margin-top:30px;text-align:center;font-family:var(--mono);font-size:11px;color:var(--faint);letter-spacing:.05em}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ============ HEADER ============ -->
+  <header>
+    <div class="eyebrow">System Pipeline · End-to-End Schematic</div>
+    <h1>HumanEgo
+      <span class="sub">从「人类第一视角视频」到「零样本机器人策略」的完整数据流：采集 → 处理 → 架构 → 训练 → 部署</span>
+    </h1>
+    <p class="lede">下面这张图把论文的五个阶段串成一条数据流，逐段标注张量维度、数据来源与控制细节。<strong style="color:var(--ink)">绿色 = 论文明文事实</strong>，<strong style="color:var(--rose)">粉色虚线 = 论文未讲透、需工程推断的环节</strong>。可点右上角开关只看「确凿事实」。</p>
+    <p class="paper-tag">Wang et al., University of Maryland · arXiv:2605.24934 · "Zero-Shot Robot Learning from Minutes of Human Egocentric Videos"</p>
+
+    <div class="legend">
+      <div class="grp"><span class="sw fact"></span>论文事实</div>
+      <div class="grp"><span class="sw inf"></span>工程推断 / 欠定</div>
+      <div class="div"></div>
+      <div class="grp"><span class="sw vis"></span>视觉支路</div>
+      <div class="grp"><span class="sw spa"></span>空间支路</div>
+      <div class="toggle" id="tg"><span class="dot"></span><span id="tgtxt">推断项：显示中</span></div>
+    </div>
+  </header>
+
+  <!-- ============ STAGE 1 : DATA COLLECTION ============ -->
+  <section class="stage s1">
+    <div class="stage-head">
+      <div class="snum">01</div>
+      <div class="stitle">
+        <div class="skick">Data Acquisition</div>
+        <h2>数据采集 · 一副 Aria 眼镜，几秒一条</h2>
+        <p>人佩戴 Project Aria Gen1 眼镜在任意环境做示范——不限桌高/光照/背景，无需标定或专用工作台。设备端多传感器原始流 + 云端 MPS 后处理，共同产出度量级 6-DoF 相机轨迹与 3D 手骨架。</p>
+      </div>
+    </div>
+    <div class="accbar"></div>
+
+    <div class="grid g3">
+      <div class="card">
+        <span class="ck">Device · 设备</span>
+        <h3>Aria Gen1 眼镜 <span class="b fact">论文 3.1 / A.1</span></h3>
+        <p>单一轻量可穿戴设备。每条示范<strong>仅几秒</strong>。采集口径：约 <span class="em">30 min / 任务 @ 30 Hz</span>。</p>
+        <div class="chips">
+          <span class="chip">任意环境</span><span class="chip">无标定</span><span class="chip">无工作台</span>
+        </div>
+      </div>
+
+      <div class="card" style="grid-column:span 2">
+        <span class="ck">Raw Sensor Composition · 原始数据成分</span>
+        <h3>设备端硬件打时间戳，统一 Aria 时钟，毫秒级对齐 <span class="b fact">论文 A.1</span></h3>
+        <div class="sensors">
+          <div class="row note"><div class="k">RGB</div><div class="v">30 fps / 2 MP（中心彩色相机）— <strong style="color:var(--rose)">仅用于视频记录，不参与手部跟踪</strong></div></div>
+          <div class="row"><div class="k">SLAM</div><div class="v">2× 单色相机，30 fps / VGA — 手部跟踪与 SLAM 的真正信源</div></div>
+          <div class="row"><div class="k">ET 眼动</div><div class="v">2× 相机，10 fps / QVGA</div></div>
+          <div class="row"><div class="k">IMU</div><div class="v">两个 6 轴：1000 Hz + 800 Hz</div></div>
+          <div class="row"><div class="k">其他</div><div class="v">磁力计 · 气压计 · 7 麦克风阵列 · GPS · WiFi · BLE（同步元数据 + 环境信息）</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid g3" style="margin-top:16px">
+      <div class="card" style="grid-column:span 2">
+        <span class="ck">Cloud MPS Outputs · 机器感知服务后处理</span>
+        <h3>两路对本流程关键的信号 <span class="b fact">论文 A.1</span></h3>
+        <p><strong>① 闭环轨迹</strong>：融合 2 单色 SLAM 相机 + 2 IMU，回环检测 + 全局优化 → <span class="em">重力对齐世界系、去漂移的 6-DoF 设备轨迹</span>。每个 RGB 帧查询它，得三角化外参，并把手部关键点抬升到世界系。</p>
+        <p><strong>② 手部跟踪</strong>：MPS 手部跟踪器联合处理立体 SLAM 相机 → <span class="em">每手 21 个 3D 关键点</span>（每指 5 + 手腕），直接在世界系，带逐点置信度。</p>
+      </div>
+      <div class="card">
+        <span class="ck">→ Fed Into Algorithm</span>
+        <h3>真正进入算法的三样</h3>
+        <div class="chips">
+          <span class="chip acc"><b>RGB 流</b> 视觉观测</span>
+          <span class="chip acc"><b>MPS 相机位姿</b> 三角化+抬升</span>
+          <span class="chip acc"><b>21 手部关键点</b> ×2 手</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="flow"><span class="lbl">原始 egocentric 视频 + MPS 信号</span><span class="line"></span><span class="chev"></span></div>
+
+  <!-- ============ STAGE 2 : DATA PROCESSING ============ -->
+  <section class="stage s2">
+    <div class="stage-head">
+      <div class="snum">02</div>
+      <div class="stitle">
+        <div class="skick">Data Processing</div>
+        <h2>数据处理 · 两条支路，汇成两路观测</h2>
+        <p>把原始视频转成策略可用的 <strong style="color:var(--ink)">具身无关 RGB（视觉观测）</strong> 与 <strong style="color:var(--ink)">交互中心 token（空间观测）</strong>。两支路并行，最终在 ICT 编码处汇合。</p>
+      </div>
+    </div>
+    <div class="accbar"></div>
+
+    <!-- VISUAL BRANCH -->
+    <div class="branchhead vis"><span class="tag">支路 A</span>视觉观测预处理 · 抹身体、画夹爪<span class="ln"></span></div>
+    <div class="grid g2">
+      <div class="card">
+        <span class="ck">Step 1 · 消除外观差</span>
+        <h3>SAM2 分割 + LaMa 修补 <span class="b vis">视觉</span><span class="b fact">论文 3.2</span></h3>
+        <p>分割人手与手臂 → LaMa 把它们<strong>抹掉</strong>，消除视觉上的具身差异（人臂 ≠ 机械臂）。</p>
+      </div>
+      <div class="card">
+        <span class="ck">Step 2 · 隐式编码位姿</span>
+        <h3>渲染虚拟夹爪 + 物体关键点 <span class="b vis">视觉</span><span class="b fact">论文 3.2</span></h3>
+        <p>在修补后的图上画出一个虚拟夹爪和被跟踪物体关键点（均来自支路 B），把 6D 位姿作为<span class="em">视觉线索</span>隐式写进图像。不靠昂贵的域适应。</p>
+        <div class="io"><span class="pill out">输出：具身无关 RGB 240×320</span></div>
+      </div>
+    </div>
+
+    <!-- SPATIAL BRANCH -->
+    <div class="branchhead spa" style="margin-top:22px"><span class="tag">支路 B</span>空间观测预处理 · 手→夹爪、物体位姿、ICT<span class="ln"></span></div>
+
+    <div class="grid g2">
+      <!-- B1 hand -->
+      <div class="card">
+        <span class="ck">B1 · Hand → Gripper</span>
+        <h3>手部跟踪 + 运动优化（4 步）<span class="b spa">空间</span><span class="b fact">论文 B.3</span></h3>
+        <p>只取每手 <span class="em">5 个关键点</span>：手腕、拇指 MCP、拇指尖、食指 MCP、食指尖。原始 MPS 点有噪声、丢帧、姿态乱跳，依次清洗：</p>
+        <div class="steps">
+          <div class="st"><b>置信度掩蔽</b>：MPS 置信 &lt;0.8 的点丢弃；连续不足 <b>30 帧的检测段</b>当幽灵检测整段丢（真手会被稳定跟很久）。</div>
+          <div class="st"><b>间隙插值</b>：≤10 帧的短缺口补上 — 位置线性、姿态 SLERP。</div>
+          <div class="st"><b>Savitzky–Golay 位置平滑</b>：窗 21、阶 2，去抖但保留真实加速度。</div>
+          <div class="st"><b>EMA 姿态平滑</b>：X/Y 轴 λ=0.15，每步 Gram–Schmidt 重正交 + 强制符号一致，防 180° 翻转。</div>
+        </div>
+      </div>
+
+      <!-- B1 retarget -->
+      <div class="card">
+        <span class="ck">B1 · Virtual Parallel-Jaw Gripper</span>
+        <h3>拇指–食指 → SE(3) 位姿 T_ee + 标量抓取 g <span class="b fact">式 5/6/7</span></h3>
+        <p><strong>位置</strong>（式5）：拇指尖与食指尖<span class="em">中点</span>。</p>
+        <p><strong>姿态</strong>（式6）：在 <span class="em">MCP 关节</span>上构 Gram–Schmidt 帧，不用指尖——捏合时两指尖重合会让钳口轴塌成零向量；MCP 始终分开，数值稳定。</p>
+        <div class="fx"><span class="c"># 式6 朝向（钳口轴 x 为基准）</span>
+x = norm(p_iMCP − p_tMCP)        <span class="c">钳口轴</span>
+ỹ = ½(p_tMCP+p_iMCP) − p_wrist
+y = norm(ỹ − (ỹ·x)·x)            <span class="c">前向轴⊥x</span>
+z = x × y   <span class="k">→ R_ee=[x|y|z]∈SO(3)</span></div>
+        <p style="margin-top:9px"><strong>抓取</strong>（式7）：拇指–食指尖距按每人 d_min/d_max 归一化到 [0,1]，中值滤波 + 去抖，<span class="em">部署时二值化</span>。1 自由度，故为标量。</p>
+      </div>
+    </div>
+
+    <div class="grid g2" style="margin-top:16px">
+      <!-- B2 object -->
+      <div class="card">
+        <span class="ck">B2 · Object Tracking & Pose</span>
+        <h3>物体跟踪与位姿估计 <span class="b spa">空间</span><span class="b fact">论文 3.3 / B.1</span></h3>
+        <p><strong>位置链</strong>：Grounding DINO（文本提示检测）→ SAM2 分割 → 掩码采轮廓关键点 → CoTracker3 跨帧跟 2D → 三角化抬到 3D（用 K 与逐帧 SLAM 位姿）。取 N 点<span class="em">质心</span>抵消噪声。</p>
+        <p><strong>朝向</strong>：单独由 <span class="em">Orient-Anything V2</span> 估（学习型模型，从图像预测 3D 朝向；与位置不同源）。</p>
+        <div class="chips">
+          <span class="chip"><b>Grounding DINO</b></span><span class="chip"><b>SAM2</b></span><span class="chip"><b>CoTracker3</b></span><span class="chip"><b>Orient-Anything V2</b></span>
+        </div>
+      </div>
+
+      <!-- kinematic latching -->
+      <div class="card">
+        <span class="ck">B2 · Kinematic Latching</span>
+        <h3>运动学锁存 — 抓取期间物体被遮挡时 <span class="b fact">论文 3.3</span></h3>
+        <p>抓取一开始手就挡住物体，三角化也因「相机+物体均近静止」失效。于是假设<span class="em">物体一旦被抓即与手刚性绑定</span>：t₀ 量一次相对位姿并锁死，此后用当前手位姿外推。</p>
+        <div class="fx"><span class="c"># t=当前帧, t₀=抓取开始帧</span>
+T_obj(t) = T_hand(t) · <span class="k">T_hand(t₀)⁻¹·T_obj(t₀)</span>
+                     └─ 锁死的「物体相对手」─┘</div>
+      </div>
+    </div>
+
+    <div class="grid g2" style="margin-top:16px">
+      <!-- prerequisites -->
+      <div class="card">
+        <span class="ck">Prerequisite A · Scene Sweep</span>
+        <h3>预扫场景 1–2 s <span class="b fact">论文 B.1</span></h3>
+        <p>Aria 无深度传感器，靠移动头戴相机做多视角三角化，要求物体静止。故每条示范前加 <span class="em">30–60 帧</span>缓慢转头/前移，保持场景静止。</p>
+      </div>
+      <div class="card">
+        <span class="ck">Prerequisite B · Phase Detection</span>
+        <h3>相位检测：只留操作帧 <span class="b fact">论文 B.2</span></h3>
+        <p>用头部 6-DoF 轨迹 + 手部轨迹，把录制切成 5 种模式 MANIP / FORWARD / ROTATE / TRANSITION / FINISHED（如 MANIP 要求头线速&lt;0.03 m/s、角速&lt;0.15 rad/s 持续 ≥15 帧）。训练<span class="em">只保留 MANIP(0) 与 FINISHED(4)</span>，扔掉行走/转头/过渡——预扫与导航不进训练信号。</p>
+      </div>
+    </div>
+
+    <!-- ICT encoding -->
+    <div class="branchhead spa" style="margin-top:22px"><span class="tag">B3</span>交互中心 token（ICT）编码 · 两支路汇合点<span class="ln"></span></div>
+    <div class="grid g2">
+      <div class="card">
+        <span class="ck">Per-Entity 29-D Token</span>
+        <h3>一个实体 = 一个 token <span class="b fact">式 1</span></h3>
+        <p>每个实体（两只手 + 每个物体）各编一个 29 维 token。场景有几个实体就几个 token —— <span class="em">天然变长，物体多少都不改架构</span>。</p>
+        <div class="fx"><span class="k">ICT_k</span> = [ τ <span class="c">(1)</span> │ REF·T_E <span class="c">(9)</span> │ E·T_LH <span class="c">(9)</span> │ E·T_RH <span class="c">(9)</span> │ g <span class="c">(1)</span> ]
+                            <span class="k">= 29</span>
+每个 SE(3) → 9D = 归一化平移(3) + 6D 旋转(6)</div>
+      </div>
+      <div class="card">
+        <span class="ck">Why Relative-to-Entity</span>
+        <h3>两种坐标系的分工 = 设计命门 <span class="b fact">论文 3.3</span></h3>
+        <p><strong>τ</strong> 类型（手/物体）。<strong>REF·T_E</strong>：实体在<span style="color:var(--azure)">共享相机系</span>的「绝对」位姿（唯一绑相机的一段）。<strong>E·T_LH / E·T_RH</strong>：左/右手表达在<span class="em">实体自己的局部系</span>里——这段相对量直接就是「接近/抓取/搬运」的操作状态。<strong>g</strong>：手为二值指距，物体为哨兵值。</p>
+        <p>视角无关 → 人到机器人零样本迁移的根基；把「从像素推断 3D 几何」换成「读显式相对 6-DoF」。</p>
+      </div>
+    </div>
+
+    <div class="merge"><span class="node">↳ 输出两路观测：具身无关 RGB ＋ {ICT tokens}</span></div>
+  </section>
+
+  <div class="flow"><span class="lbl">scene state s_t = ICT tokens + 1× RGB</span><span class="line"></span><span class="chev"></span></div>
+
+  <!-- ============ STAGE 3 : ARCHITECTURE ============ -->
+  <section class="stage s3">
+    <div class="stage-head">
+      <div class="snum">03</div>
+      <div class="stitle">
+        <div class="skick">Model Architecture</div>
+        <h2>模型架构 · 流匹配 Transformer + 三辅助头</h2>
+        <p>一个<strong style="color:var(--ink)">小</strong>策略网络：6 层 transformer 解码器参数化速度场，两路条件上下文（RGB + ICT），外挂三个共享编码器的稠密辅助头，外加两个稳训技巧。</p>
+      </div>
+    </div>
+    <div class="accbar"></div>
+
+    <div class="grid g3">
+      <div class="card">
+        <span class="ck">Velocity Field v_θ</span>
+        <h3>Transformer 解码器 <span class="b fact">论文 C.1</span></h3>
+        <p>动作 chunk token 自注意 chunk 其余部分，交叉注意条件上下文。</p>
+        <div class="chips">
+          <span class="chip"><b>6</b> 层</span><span class="chip"><b>8</b> 头</span><span class="chip">embed <b>384</b></span><span class="chip">dropout <b>0.05</b></span>
+        </div>
+      </div>
+      <div class="card">
+        <span class="ck">Context · Stream ①</span>
+        <h3>RGB 路 <span class="b fact">论文 C.1</span></h3>
+        <p>240×320 输入做 <span class="em">16×16 patch 嵌入</span> + 正弦时间嵌入，经小 MLP 融合。</p>
+      </div>
+      <div class="card">
+        <span class="ck">Context · Stream ②</span>
+        <h3>状态 token 路 <span class="b fact">论文 C.1</span></h3>
+        <p>逐实体 ICT（29 维）线性投影到 <span class="em">384 通道</span>。</p>
+      </div>
+    </div>
+
+    <div class="grid g3" style="margin-top:16px">
+      <div class="card">
+        <span class="ck">Aux Head ① · L_OM</span>
+        <h3>物体动力学头 <span class="b fact">C.1</span></h3>
+        <p>预测被操作物体未来 <span class="em">9-D 位姿轨迹</span>。损失 0.5·(w_p,w_r) 加权 MSE。</p>
+      </div>
+      <div class="card">
+        <span class="ck">Aux Head ② · L_2D</span>
+        <h3>2D 视觉前瞻头 <span class="b fact">C.1</span></h3>
+        <p>输出 <span class="em">K×3×2</span> 个归一化图像坐标（3 锚点），经浅反卷积栈。权重 w_f=20。</p>
+      </div>
+      <div class="card">
+        <span class="ck">Aux Head ③ · L_LC</span>
+        <h3>时序一致性头 <span class="b fact">C.1</span></h3>
+        <p>预测 <span class="em">K 步之后的手 token</span>，掩码 MSE，权重 w_c∈[0.1,1.0]。</p>
+      </div>
+    </div>
+
+    <div class="grid g2" style="margin-top:16px">
+      <div class="card">
+        <span class="ck">Stabilizer · Region Attention</span>
+        <h3>区域注意力（式8）<span class="b fact">C.1</span></h3>
+        <p>以当前操作锚点 2D 投影为中心，把<span class="em">高斯「聚光灯」</span>乘到图像交叉注意力 logits 上，空间尺度 σ 可学，软聚焦而不硬裁剪。</p>
+        <div class="fx">w(u,v) = exp( −[(u−u₀)²+(v−v₀)²] / 2σ² )   <span class="c">σ 可学</span></div>
+      </div>
+      <div class="card">
+        <span class="ck">Stabilizer · State-Noise Injection</span>
+        <h3>状态噪声注入 <span class="b fact">C.1</span></h3>
+        <p>训练时对每个<span class="em">手 token 加 ε~N(0,Σs)</span>，位置/6D 旋转/抓取通道各自设标准差，使策略对部署时的小感知噪声鲁棒。</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="flow"><span class="lbl">条件流匹配 + 三辅助目标</span><span class="line"></span><span class="chev"></span></div>
+
+  <!-- ============ STAGE 4 : TRAINING ============ -->
+  <section class="stage s4">
+    <div class="stage-head">
+      <div class="snum">04</div>
+      <div class="stitle">
+        <div class="skick">Policy Training</div>
+        <h2>策略训练 · 纯人类视频，零机器人数据</h2>
+        <p>动作「真值」全部由感知管线自动产出（手→夹爪重定向得到的 SE(3) 轨迹 + 抓取），无任何人工标注、无机器人数据、无互联网级预训练。</p>
+      </div>
+    </div>
+    <div class="accbar"></div>
+
+    <div class="grid g2">
+      <div class="card">
+        <span class="ck">Policy I/O</span>
+        <h3>输入 → 输出 <span class="b fact">论文 3.4</span></h3>
+        <div class="io">
+          <span class="pill in">输入 s_t = {ICT tokens} + 1× RGB</span>
+        </div>
+        <div class="io">
+          <span class="pill out">输出 a ∈ R^(K×Da)</span>
+        </div>
+        <p style="margin-top:6px">输出是 K 步双臂动作轨迹，每步切片 = <span class="em">双手各自 6-DoF 位姿 + 二值抓取</span>。</p>
+        <div class="chips"><span class="chip acc">K = <b>50</b></span></div>
+      </div>
+
+      <div class="card">
+        <span class="ck">Training Data Source</span>
+        <h3>真值 x₁ 从哪来 <span class="b fact">论文 3.4</span></h3>
+        <p>完全来自<span class="em">人类 egocentric 视频</span>。x₁ = 阶段 2 的手→虚拟夹爪重定向轨迹 + 抓取，由感知管线自动产出。三个辅助目标的标签同样自动生成。</p>
+        <div class="chips"><span class="chip">无机器人数据</span><span class="chip">无人工标注</span><span class="chip">无预训练</span></div>
+      </div>
+    </div>
+
+    <div class="grid g2" style="margin-top:16px">
+      <div class="card">
+        <span class="ck">Primary Loss · Conditional Flow Matching</span>
+        <h3>主损失（式2）<span class="b fact">论文 C.1</span></h3>
+        <p>学一个速度场把高斯先验搬运到动作目标；线性路径、常量目标速度。</p>
+        <div class="fx">x_t = (1−t)·x₀ + t·x₁ ,  t~U(0,1) , x₀~N(0,I)
+v_target = x₁ − x₀
+<span class="k">L_FM</span> = E[ w_p‖Δp‖² + w_r‖Δr‖² + w_g‖Δg‖² ]
+        位置 <span class="k">w_p=5</span> · 旋转 <span class="k">w_r=1</span> · 抓取 <span class="k">w_g=10</span></div>
+        <p style="margin-top:8px">另实现 OT-CFM（批内匈牙利匹配得更直的流），<span class="em">默认关闭</span>（无稳定收益）。</p>
+      </div>
+      <div class="card">
+        <span class="ck">Total Objective</span>
+        <h3>主损 + 三辅助（式3）<span class="b fact">论文 3.4</span></h3>
+        <div class="fx"><span class="k">L</span> = L_FM + λ_OM·L_OM + λ_2D·L_2D + λ_LC·L_LC</div>
+        <p style="margin-top:8px">三辅助都在不同空间做<span class="em">前向动力学预测</span>（3D 物理 / 2D 视觉 / 潜空间），相当于给共享编码器装轻量世界模型，并充当多任务正则——低数据区收益最大。</p>
+      </div>
+    </div>
+
+    <div class="grid g2" style="margin-top:16px">
+      <div class="card">
+        <span class="ck">Optimization Recipe</span>
+        <h3>优化配方 <span class="b fact">论文 C.1</span></h3>
+        <div class="chips">
+          <span class="chip"><b>AdamW</b></span><span class="chip">LR <b>1e-4</b></span><span class="chip">cosine + 200 warmup</span>
+          <span class="chip">minLR 0.05</span><span class="chip">batch <b>32</b></span><span class="chip"><b>400</b> epoch</span>
+          <span class="chip">grad clip 1.0</span><span class="chip">bf16</span><span class="chip">EMA 0.999</span>
+        </div>
+      </div>
+      <div class="card">
+        <span class="ck">Data Augmentation</span>
+        <h3>把 ~40 min 扩成更大分布 <span class="b fact">论文 C.1</span></h3>
+        <p><strong>图像</strong>：光度抖动 p=0.8、随机缩放裁剪 p=0.5、高斯模糊 p=0.15、随机擦除 p=0.5…</p>
+        <p><strong>动作目标</strong>：每目标位姿加 σ_pos=1 mm、σ_rot=0.5° 噪声。<strong>时序</strong>：p=0.5 子步插值。</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="flow"><span class="lbl">训练完成 → 权重 EMA 用于部署</span><span class="line"></span><span class="chev"></span></div>
+
+  <!-- ============ STAGE 5 : DEPLOYMENT ============ -->
+  <section class="stage s5">
+    <div class="stage-head">
+      <div class="snum">05</div>
+      <div class="stitle">
+        <div class="skick">Deployment & Inference</div>
+        <h2>部署与推理 · 解 ODE 出动作块，10 Hz 闭环执行</h2>
+        <p>训练全用 Aria，部署换到真机：固定步长 Euler 解流匹配 ODE，一次前向得整段动作块，再以分块控制下发。这是论文交代最不充分的一段，机器人侧的 ICT 构造多为合理推断。</p>
+      </div>
+    </div>
+    <div class="accbar"></div>
+
+    <div class="grid g3">
+      <div class="card">
+        <span class="ck">Hardware</span>
+        <h3>真机平台 <span class="b fact">论文 D.1</span></h3>
+        <p><span class="em">2× Trossen WidowX AI</span> 并排双臂，6-DoF 平行夹爪，满伸 ~1.5 kg，±1 mm。视觉只用<span class="em">一台顶置 RealSense D405</span>，其 RGB 是唯一观测。</p>
+        <div class="chips"><span class="chip">腕部相机刻意不用</span><span class="chip">ACT 基线才用腕相机</span></div>
+      </div>
+      <div class="card">
+        <span class="ck">ODE Rollout</span>
+        <h3>固定步长 Euler · 20 步 <span class="b fact">论文 D.2</span></h3>
+        <p>x₀~N(0,I) 在加载时抽一次，迭代 x_{t+Δt} ← x_t + v_θ·Δt（Δt=1/20），<span class="em">一次前向得 K=50 步双臂块</span>。</p>
+        <div class="fx">unpack:  位置→均值方差反归一
+         旋转→归一化+Gram–Schmidt→SO(3)
+         抓取→sigmoid</div>
+      </div>
+      <div class="card">
+        <span class="ck">Control Loop</span>
+        <h3>动作分块控制 <span class="b fact">论文 D.2</span></h3>
+        <p>控制器 <span class="em">10 Hz 重规划</span>，历史最多留 1 条，每周期执行 1 个动作。stride=2 下采样 → 有效 5 Hz；前瞻偏移 25 步掩盖规划延迟。</p>
+        <p>抓取 <span class="em">any-over-horizon</span>：当前块任一步抓取概率 &gt;0.6 即闭爪；可选 grasp-latch 锁死防误松。</p>
+      </div>
+    </div>
+
+    <div class="grid g2" style="margin-top:16px">
+      <div class="card">
+        <span class="ck">Smoothing & Safety</span>
+        <h3>平滑与安全笼 <span class="b fact">论文 D.2</span></h3>
+        <p>下发前：位置 EMA λ=0.5 + 旋转四元数 SLERP；轨迹重叠混合（参 12）防顿挫。</p>
+        <p>安全笼限每周期位移 ≤0.08 m、旋转 ≤0.02 rad（实验中未触发钳制）。</p>
+      </div>
+      <div class="card inf">
+        <span class="ck">Underdetermined · 论文未明写</span>
+        <h3>部署时 ICT 怎么构造 <span class="b inf">推断</span></h3>
+        <p>机器人侧显然用<span style="color:var(--rose)">夹爪位姿替代手位姿</span>（这正是 ICT 跨具身设计的目的），物体仍用同一套 DINO+SAM2+位姿估计。但论文<strong>没写</strong>夹爪位姿如何进入共享相机系（相机-机器人外参标定？取自正运动学？），也没写 RealSense 深度是否被直接用来得物体位姿（采集端因无深度才需三角化与预扫，部署端有深度相机很可能不再需要——但未确认）。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ CAVEATS ============ -->
+  <div class="caveats">
+    <h4>◆ 引用时要警惕的几处「边界没说清」</h4>
+    <ul>
+      <li><b>数据规模口径不统一</b>：正文/多数实验是 30 min / 45 demos；表 1（满配）却写 40 min / 60 demos；附录另有「约 40 min」。主结果多以 30 min 为口径——引数字需注明出处。</li>
+      <li><b>「人类视频是更优数据源」带强前提</b>：E.1 已证明把立体 Aria-MPS 换成普通单目，成功率 95→45→32.5→0%。严格说是「Aria-grade 立体 human video」，效果有相当一部分是立体硬件 + 重型感知栈的功劳。</li>
+      <li><b>泛化边界被乐观表述</b>：4.3 说 camera-frame 换视角仍 85–91%，E.3 又说 camera frame 重置相机会「显著退化」。合理调和：鲁棒性主要来自 ICT 的相对项 E·T_LH/E·T_RH（本就视角无关），只有 REF·T_E 那 9 维绑相机——但论文未把这层关系讲透。</li>
+      <li><b>单任务一策略，非基础模型</b>：每个任务训一个任务专用策略（超参共享 ≠ 权重共享），6 层 / 384 维的小网络 + 分钟级数据。它和 RT-2、π0 不在一个赛道，92.5% 不宜直接与基础模型对比。</li>
+      <li><b>论文承认的硬限制</b>：依赖立体手部跟踪；逐帧检测不能做 in-hand 等动态操作；感知前端误差会级联；少样本精度卡在约 1 cm。</li>
+    </ul>
+  </div>
+
+  <footer>HumanEgo Pipeline · 基于论文正文 §3–4 与附录 A–F 绘制 · 绿=事实 / 粉=推断</footer>
+
+</div>
+
+<script>
+  // staggered reveal
+  const obs=new IntersectionObserver((es)=>{es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');obs.unobserve(e.target)}})},{threshold:.12});
+  document.querySelectorAll('.stage').forEach(s=>obs.observe(s));
+
+  // fact / inference toggle
+  const tg=document.getElementById('tg'), txt=document.getElementById('tgtxt');
+  tg.addEventListener('click',()=>{
+    document.body.classList.toggle('hide-inf');
+    const hidden=document.body.classList.contains('hide-inf');
+    txt.textContent=hidden?'推断项：已淡出':'推断项：显示中';
+  });
+</script>
+</body>
+</html>
