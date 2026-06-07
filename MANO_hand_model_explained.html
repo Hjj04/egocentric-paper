@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MANO 手部参数模型 · 面向具身领域</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,900&family=Noto+Serif+SC:wght@400;500;700;900&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#F3EEE2;
+    --paper-2:#EDE7D8;
+    --surface:#FBF8F1;
+    --ink:#1C2A31;
+    --ink-soft:#3C4953;
+    --muted:#73695A;
+    --blue:#1C4A66;
+    --blue-deep:#143546;
+    --clay:#BB4A2C;
+    --clay-soft:#C9603F;
+    --line:#D6CDB9;
+    --line-soft:#E2DACB;
+    --glow: rgba(28,74,102,.18);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:"Noto Serif SC",serif;
+    line-height:1.78;
+    font-size:16.5px;
+    -webkit-font-smoothing:antialiased;
+    background-image:
+      linear-gradient(var(--line-soft) 1px,transparent 1px),
+      linear-gradient(90deg,var(--line-soft) 1px,transparent 1px);
+    background-size:32px 32px;
+    background-position:center top;
+  }
+  body::before{
+    content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+    background:radial-gradient(ellipse 90% 60% at 50% -10%, rgba(28,74,102,.07), transparent 70%);
+  }
+  .wrap{max-width:880px;margin:0 auto;padding:0 26px;position:relative;z-index:1}
+
+  /* ---------- header ---------- */
+  header{padding:74px 0 40px;border-bottom:2px solid var(--ink)}
+  .kicker{
+    font-family:"IBM Plex Mono",monospace;
+    font-size:12px;letter-spacing:.32em;text-transform:uppercase;
+    color:var(--clay);font-weight:600;margin-bottom:20px;
+    display:flex;align-items:center;gap:14px;
+  }
+  .kicker::after{content:"";flex:1;height:1px;background:var(--line)}
+  h1{
+    font-family:"Fraunces",serif;font-weight:900;font-size:clamp(40px,7.6vw,72px);
+    line-height:.98;letter-spacing:-.015em;color:var(--blue-deep);
+    margin-bottom:8px;
+  }
+  h1 .cjk{font-family:"Noto Serif SC",serif;font-weight:900;display:block;
+    font-size:clamp(22px,3.6vw,32px);color:var(--ink);letter-spacing:.01em;margin-top:14px}
+  .lede{
+    font-size:18px;color:var(--ink-soft);margin-top:24px;max-width:62ch;
+  }
+  .meta{
+    margin-top:26px;display:flex;flex-wrap:wrap;gap:10px;
+    font-family:"IBM Plex Mono",monospace;font-size:12px;
+  }
+  .meta span{
+    border:1px solid var(--line);background:var(--surface);
+    padding:4px 11px;border-radius:2px;color:var(--muted);
+  }
+
+  /* ---------- one-liner callout ---------- */
+  .anchor{
+    margin:42px 0;padding:30px 32px;
+    background:var(--blue-deep);color:#F4EFE3;border-radius:4px;
+    position:relative;overflow:hidden;
+    box-shadow:0 18px 40px -24px var(--glow);
+  }
+  .anchor::before{
+    content:"≡";position:absolute;right:-6px;top:-26px;font-size:160px;
+    font-family:"Fraunces",serif;color:rgba(255,255,255,.06);line-height:1;
+  }
+  .anchor .tag{
+    font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.25em;
+    text-transform:uppercase;color:var(--clay-soft);margin-bottom:12px;
+  }
+  .anchor p{font-size:19px;line-height:1.7;position:relative}
+  .anchor b{color:#fff;font-weight:700}
+
+  /* ---------- sections ---------- */
+  section{padding:46px 0;border-bottom:1px solid var(--line)}
+  .sec-head{display:flex;align-items:baseline;gap:16px;margin-bottom:24px}
+  .sec-num{
+    font-family:"IBM Plex Mono",monospace;font-size:13px;font-weight:600;
+    color:var(--clay);border:1.5px solid var(--clay);border-radius:50%;
+    width:34px;height:34px;display:grid;place-items:center;flex-shrink:0;
+  }
+  h2{
+    font-family:"Noto Serif SC",serif;font-weight:700;font-size:25px;
+    color:var(--blue-deep);letter-spacing:.005em;line-height:1.3;
+  }
+  h2 .en{font-family:"Fraunces",serif;font-weight:600;color:var(--muted);
+    font-size:15px;display:block;margin-top:2px;letter-spacing:0}
+  p{margin:0 0 16px}
+  p:last-child{margin-bottom:0}
+  strong{color:var(--blue);font-weight:700}
+  .clay{color:var(--clay);font-weight:700}
+  code,.mono{font-family:"IBM Plex Mono",monospace;font-size:.9em;
+    background:var(--paper-2);padding:1px 6px;border-radius:3px;color:var(--blue-deep)}
+
+  /* ---------- figure ---------- */
+  figure{
+    margin:8px 0 8px;background:var(--surface);border:1px solid var(--line);
+    border-radius:6px;padding:26px;
+    box-shadow:0 14px 34px -28px var(--glow);
+  }
+  .fig-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:24px;align-items:center}
+  figcaption{
+    font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--muted);
+    margin-top:18px;text-align:center;letter-spacing:.04em;
+  }
+  .legend{display:flex;flex-direction:column;gap:14px}
+  .legend .lh{font-family:"IBM Plex Mono",monospace;font-size:11px;
+    letter-spacing:.2em;text-transform:uppercase;color:var(--clay);margin-bottom:2px}
+  .legend .row{display:flex;align-items:center;gap:11px;font-size:14.5px;line-height:1.5}
+  .dot{width:14px;height:14px;border-radius:50%;flex-shrink:0}
+  .dot.filled{background:var(--blue);box-shadow:0 0 0 3px rgba(28,74,102,.16)}
+  .dot.hollow{background:var(--surface);border:2px solid var(--clay)}
+  .dot.bone{width:18px;height:2.5px;border-radius:0;background:var(--ink-soft)}
+
+  /* ---------- param cards ---------- */
+  .cards{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin:6px 0}
+  .card{
+    background:var(--surface);border:1px solid var(--line);border-radius:6px;
+    padding:24px;position:relative;transition:transform .25s ease,box-shadow .25s ease;
+  }
+  .card:hover{transform:translateY(-3px);box-shadow:0 18px 36px -26px var(--glow)}
+  .card .ct{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.18em;
+    text-transform:uppercase;margin-bottom:6px}
+  .card.pose .ct{color:var(--blue)}
+  .card.shape .ct{color:var(--clay)}
+  .card h3{font-family:"Noto Serif SC",serif;font-weight:700;font-size:20px;margin-bottom:4px;color:var(--ink)}
+  .card .sym{font-family:"Fraunces",serif;font-size:34px;font-weight:900;line-height:1;
+    position:absolute;top:20px;right:22px;color:var(--line)}
+  .card.pose .sym{color:rgba(28,74,102,.22)}
+  .card.shape .sym{color:rgba(187,74,44,.22)}
+  .card ul{list-style:none;margin-top:14px;display:flex;flex-direction:column;gap:9px}
+  .card li{font-size:14.5px;line-height:1.55;padding-left:18px;position:relative;color:var(--ink-soft)}
+  .card li::before{content:"▪";position:absolute;left:0;color:var(--muted)}
+  .card .dim{margin-top:16px;font-family:"IBM Plex Mono",monospace;font-size:13px;
+    border-top:1px dashed var(--line);padding-top:12px;color:var(--blue-deep)}
+
+  /* ---------- equation ---------- */
+  .eq{
+    background:var(--blue-deep);color:#EFE9DC;border-radius:6px;padding:24px 26px;
+    margin:8px 0;overflow-x:auto;
+  }
+  .eq .formula{font-family:"IBM Plex Mono",monospace;font-size:17px;line-height:2;
+    color:#fff;text-align:center;white-space:nowrap;letter-spacing:.01em}
+  .eq .formula .v{color:var(--clay-soft)}
+  .eq .formula .b{color:#86C5E0}
+  .eq .terms{margin-top:18px;display:grid;grid-template-columns:1fr 1fr;gap:8px 24px;
+    font-size:13.5px;color:#C8C0AE;border-top:1px solid rgba(255,255,255,.12);padding-top:16px}
+  .eq .terms b{font-family:"IBM Plex Mono",monospace;color:#fff;font-weight:500;margin-right:6px}
+
+  /* ---------- table ---------- */
+  .tbl-wrap{overflow-x:auto;margin:6px 0;border:1px solid var(--line);border-radius:6px}
+  table{width:100%;border-collapse:collapse;font-size:14.5px;background:var(--surface);min-width:560px}
+  thead th{
+    background:var(--blue-deep);color:#F4EFE3;text-align:left;padding:13px 16px;
+    font-family:"Noto Serif SC",serif;font-weight:500;font-size:13.5px;letter-spacing:.02em;
+  }
+  tbody td{padding:12px 16px;border-bottom:1px solid var(--line-soft);vertical-align:top}
+  tbody tr:last-child td{border-bottom:none}
+  tbody tr:nth-child(even){background:rgba(0,0,0,.014)}
+  td .m{font-family:"IBM Plex Mono",monospace;font-size:13px;color:var(--blue);font-weight:500}
+  td.metric{color:var(--clay);font-weight:700;font-family:"IBM Plex Mono",monospace;font-size:13px}
+
+  /* ---------- embodied bridge ---------- */
+  .bridge{display:flex;flex-direction:column;gap:0}
+  .bp{display:grid;grid-template-columns:42px 1fr;gap:18px;padding:18px 0;border-bottom:1px dashed var(--line)}
+  .bp:last-child{border-bottom:none}
+  .bp .n{font-family:"Fraunces",serif;font-weight:900;font-size:30px;color:var(--clay);
+    line-height:1;opacity:.85}
+  .bp h4{font-family:"Noto Serif SC",serif;font-weight:700;font-size:17px;color:var(--blue-deep);margin-bottom:6px}
+  .bp p{font-size:15px;color:var(--ink-soft);margin:0}
+
+  .note{
+    margin-top:24px;background:#F7EEE6;border-left:3px solid var(--clay);
+    padding:16px 20px;border-radius:0 4px 4px 0;font-size:14.5px;color:var(--ink-soft);
+  }
+  .note b{color:var(--clay)}
+
+  /* ---------- footer ---------- */
+  footer{padding:40px 0 64px;text-align:center}
+  footer .ref{font-family:"IBM Plex Mono",monospace;font-size:12.5px;color:var(--muted);line-height:1.9}
+  footer .ref b{color:var(--ink)}
+
+  /* ---------- animations ---------- */
+  @keyframes rise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+  .reveal{opacity:0;animation:rise .7s cubic-bezier(.2,.7,.2,1) forwards}
+  header .reveal:nth-child(1){animation-delay:.05s}
+  header .reveal:nth-child(2){animation-delay:.13s}
+  header .reveal:nth-child(3){animation-delay:.21s}
+  header .reveal:nth-child(4){animation-delay:.29s}
+  @keyframes draw{from{stroke-dashoffset:var(--len)}to{stroke-dashoffset:0}}
+  @keyframes pop{from{opacity:0;transform:scale(.4)}to{opacity:1;transform:scale(1)}}
+  svg .bone{stroke-dasharray:var(--len);stroke-dashoffset:var(--len);
+    animation:draw 1.1s ease forwards .35s}
+  svg .joint{opacity:0;animation:pop .4s ease forwards}
+
+  @media(max-width:680px){
+    .fig-grid{grid-template-columns:1fr}
+    .cards{grid-template-columns:1fr}
+    .eq .terms{grid-template-columns:1fr}
+    body{font-size:16px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="kicker reveal">参数化手部模型 · Technical Note</div>
+    <h1 class="reveal">MANO<span class="cjk">一只手的「坐标」长什么样</span></h1>
+    <p class="lede reveal">写给做具身、VLA、世界动作模型的人——为什么 ego 人手数据、灵巧手动作几乎都绕不开它，以及它到底编码了什么、没编码什么。</p>
+    <div class="meta reveal">
+      <span>Romero · Tzionas · Black, 2017</span>
+      <span>SMPL 家族 · 手部版</span>
+      <span>778 顶点 / 16 关节</span>
+    </div>
+  </header>
+
+  <div class="anchor">
+    <div class="tag">一句话定位</div>
+    <p>MANO 是<b>手部版的 SMPL</b>：一个<b>可微的参数化三角网格模型</b>。它用一组很短的参数向量，就能确定一只手的<b>完整三维形态</b>——既包括「这是谁的手」（胖瘦大小），也包括「这只手此刻摆成什么样」（每根手指弯成什么角度）。</p>
+  </div>
+
+  <!-- ============ 1 ============ -->
+  <section>
+    <div class="sec-head">
+      <div class="sec-num">1</div>
+      <h2>它由什么构成<span class="en">A mesh + a kinematic skeleton</span></h2>
+    </div>
+    <p>MANO 不是一堆散落的关键点，而是一张<strong>有拓扑结构的可形变网格</strong>，下面挂着一副<strong>关节骨架</strong>。网格负责「皮」（外形可视、可渲染），骨架负责「骨」（怎么弯）。</p>
+
+    <figure>
+      <div class="fig-grid">
+        <div>
+          <svg viewBox="0 0 320 420" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="MANO 手部关节示意图">
+            <!-- palm fill -->
+            <path d="M180,378 L128,296 L140,200 L180,195 L218,202 L252,215 Z"
+                  fill="rgba(28,74,102,.05)" stroke="none"/>
+            <!-- bones -->
+            <g fill="none" stroke="#3C4953" stroke-width="3" stroke-linecap="round">
+              <path class="bone" style="--len:200" d="M180,378 L140,200"/>
+              <path class="bone" style="--len:185" d="M180,378 L180,195"/>
+              <path class="bone" style="--len:190" d="M180,378 L218,202"/>
+              <path class="bone" style="--len:200" d="M180,378 L252,215"/>
+              <path class="bone" style="--len:120" d="M180,378 L128,296"/>
+              <!-- index chain -->
+              <path class="bone" style="--len:120" d="M140,200 L135,150 L132,118 L130,92"/>
+              <!-- middle chain -->
+              <path class="bone" style="--len:125" d="M180,195 L178,138 L176,102 L175,74"/>
+              <!-- ring chain -->
+              <path class="bone" style="--len:120" d="M218,202 L222,150 L225,118 L227,94"/>
+              <!-- pinky chain -->
+              <path class="bone" style="--len:100" d="M252,215 L258,175 L262,148 L265,126"/>
+              <!-- thumb chain -->
+              <path class="bone" style="--len:140" d="M128,296 L98,250 L80,214 L66,182"/>
+            </g>
+            <!-- fingertips (hollow, keypoint only) -->
+            <g fill="#FBF8F1" stroke="#BB4A2C" stroke-width="2.5">
+              <circle class="joint" style="animation-delay:1.3s" cx="130" cy="92" r="6"/>
+              <circle class="joint" style="animation-delay:1.35s" cx="175" cy="74" r="6"/>
+              <circle class="joint" style="animation-delay:1.4s" cx="227" cy="94" r="6"/>
+              <circle class="joint" style="animation-delay:1.45s" cx="265" cy="126" r="6"/>
+              <circle class="joint" style="animation-delay:1.5s" cx="66" cy="182" r="6"/>
+            </g>
+            <!-- 15 finger joints (filled) -->
+            <g fill="#1C4A66">
+              <!-- index -->
+              <circle class="joint" style="animation-delay:.9s" cx="140" cy="200" r="6.5"/>
+              <circle class="joint" style="animation-delay:.95s" cx="135" cy="150" r="6"/>
+              <circle class="joint" style="animation-delay:1s" cx="132" cy="118" r="5.5"/>
+              <!-- middle -->
+              <circle class="joint" style="animation-delay:.9s" cx="180" cy="195" r="6.5"/>
+              <circle class="joint" style="animation-delay:.95s" cx="178" cy="138" r="6"/>
+              <circle class="joint" style="animation-delay:1s" cx="176" cy="102" r="5.5"/>
+              <!-- ring -->
+              <circle class="joint" style="animation-delay:.9s" cx="218" cy="202" r="6.5"/>
+              <circle class="joint" style="animation-delay:.95s" cx="222" cy="150" r="6"/>
+              <circle class="joint" style="animation-delay:1s" cx="225" cy="118" r="5.5"/>
+              <!-- pinky -->
+              <circle class="joint" style="animation-delay:.9s" cx="252" cy="215" r="6.5"/>
+              <circle class="joint" style="animation-delay:.95s" cx="258" cy="175" r="5.5"/>
+              <circle class="joint" style="animation-delay:1s" cx="262" cy="148" r="5"/>
+              <!-- thumb -->
+              <circle class="joint" style="animation-delay:.9s" cx="128" cy="296" r="6.5"/>
+              <circle class="joint" style="animation-delay:.95s" cx="98" cy="250" r="6"/>
+              <circle class="joint" style="animation-delay:1s" cx="80" cy="214" r="5.5"/>
+            </g>
+            <!-- wrist root (special) -->
+            <circle class="joint" style="animation-delay:.8s" cx="180" cy="378" r="9" fill="#BB4A2C"/>
+            <circle class="joint" style="animation-delay:.8s" cx="180" cy="378" r="9" fill="none" stroke="#143546" stroke-width="2.5"/>
+
+            <!-- labels -->
+            <g font-family="IBM Plex Mono, monospace" font-size="10.5" fill="#73695A">
+              <text x="118" y="118" text-anchor="end">DIP</text>
+              <text x="121" y="150" text-anchor="end">PIP</text>
+              <text x="126" y="204" text-anchor="end">MCP</text>
+              <text x="135" y="84" text-anchor="middle" fill="#BB4A2C">指尖</text>
+            </g>
+            <g font-family="IBM Plex Mono, monospace" font-size="11" fill="#143546" font-weight="600">
+              <text x="196" y="382">腕根 root</text>
+            </g>
+          </svg>
+        </div>
+        <div class="legend">
+          <div>
+            <div class="lh">网格 Mesh</div>
+            <div class="row"><span style="font-family:'IBM Plex Mono';color:var(--blue);font-weight:600">778</span> 顶点 · <span style="font-family:'IBM Plex Mono';color:var(--blue);font-weight:600">1538</span> 三角面</div>
+          </div>
+          <div>
+            <div class="lh">骨架 Skeleton</div>
+            <div class="row"><span class="dot filled"></span><b style="color:var(--blue)">15</b>&nbsp;个手指关节 (5指×3)</div>
+            <div class="row"><span class="dot" style="background:var(--clay)"></span><b style="color:var(--clay)">1</b>&nbsp;个腕根 (root)</div>
+            <div class="row"><span class="dot hollow"></span><b style="color:var(--clay)">5</b>&nbsp;指尖（仅关键点，非关节）</div>
+          </div>
+          <div>
+            <div class="lh">合计</div>
+            <div class="row"><b style="color:var(--blue-deep)">16</b>&nbsp;关节 ＋ 5 指尖 ＝ <b style="color:var(--blue-deep)">21</b> 关键点</div>
+          </div>
+        </div>
+      </div>
+      <figcaption>MANO 关节拓扑：每根手指 3 个关节 (MCP→PIP→DIP)，根部统一连到腕根</figcaption>
+    </figure>
+
+    <p>关键一点：这副骨架是一棵<strong>运动学树</strong>——腕根是所有手指的父节点，手指上的关节一节套一节。「弯手指」在数学上就是<strong>旋转这些关节</strong>。</p>
+  </section>
+
+  <!-- ============ 2 ============ -->
+  <section>
+    <div class="sec-head">
+      <div class="sec-num">2</div>
+      <h2>两类参数：动作与身份<span class="en">Pose vs. Shape — the heart of it</span></h2>
+    </div>
+    <p>这是理解 MANO 最重要的区分。它把「一只手」拆成两组互不相干的参数——一组管<strong>这只手在做什么</strong>，一组管<strong>这是谁的手</strong>。</p>
+
+    <div class="cards">
+      <div class="card pose">
+        <div class="sym">θ</div>
+        <div class="ct">Pose · 姿态 / 关节</div>
+        <h3>它在做什么</h3>
+        <ul>
+          <li>每个关节的旋转，用<b>轴角 (axis-angle)</b> 表示，一个关节 3 个数</li>
+          <li>15 个手指关节 × 3 ＝ <b>45 维</b>（手指弯曲/张开）</li>
+          <li>＋ 腕根全局朝向 <b>3 维</b></li>
+          <li>这是<b>逐帧变化</b>的——就是「动作」的本体</li>
+        </ul>
+        <div class="dim">θ ∈ ℝ⁴⁵ （+3 全局旋转）</div>
+      </div>
+      <div class="card shape">
+        <div class="sym">β</div>
+        <div class="ct">Shape · 形状 / 身份</div>
+        <h3>这是谁的手</h3>
+        <ul>
+          <li>手的<b>形态</b>：大小、胖瘦、手指长短比例</li>
+          <li><b>10 个 PCA 系数</b>，从大量真人手部扫描里学出来的</li>
+          <li>person-specific：同一只手<b>通常固定不变</b></li>
+          <li>做动作建模时一般<b>锁死它</b>，不当作动作</li>
+        </ul>
+        <div class="dim">β ∈ ℝ¹⁰</div>
+      </div>
+    </div>
+
+    <p style="margin-top:20px">一个直观说法：<strong>β 决定「手套的尺码」，θ 决定「手套此刻的姿势」</strong>。换一个人，β 变、θ 可以一样；同一个人做不同动作，β 不变、θ 在变。</p>
+    <div class="note"><b>对具身的含义　</b>跨人 / 跨手泛化时，<strong>β 正是要被归一化或重定向掉的那一维</strong>；而你真正要学、要预测、要重定向到机器人的，是 <span class="clay">θ</span>（再加下面的全局腕部位姿）。</div>
+  </section>
+
+  <!-- ============ 3 ============ -->
+  <section>
+    <div class="sec-head">
+      <div class="sec-num">3</div>
+      <h2>PCA 姿态空间：为什么能压缩<span class="en">Hands live on a low-dimensional manifold</span></h2>
+    </div>
+    <p>45 维听起来不少，但真实的手<strong>不会乱摆</strong>——手指之间高度相关（攥拳时五指一起弯，很难单独把无名指折成怪角度）。所以全部合理的手姿其实落在一个<strong>低维流形</strong>上。</p>
+    <p>MANO 因此额外提供一个 <strong>PCA 姿态空间</strong>：你可以不用全 45 维，只取前 <code>6 ~ 45</code> 个主成分就能覆盖绝大多数自然手姿。维度更低、更稳、更容易让神经网络/估计器回归——代价是放弃一些极端姿态的表达力。这是工程里常用的旋钮。</p>
+  </section>
+
+  <!-- ============ 4 ============ -->
+  <section>
+    <div class="sec-head">
+      <div class="sec-num">4</div>
+      <h2>前向模型：参数怎么变成网格<span class="en">A differentiable function M(β, θ) → mesh</span></h2>
+    </div>
+    <p>MANO 的核心是一个<strong>可微函数</strong>：喂进 (β, θ)，吐出 778 个顶点的三维坐标。可微这一点对我们至关重要——意味着可以<strong>反向传播</strong>、可以拟合到图像/数据、可以直接塞进神经网络当一层。</p>
+
+    <div class="eq">
+      <div class="formula">M(<span class="b">β</span>,<span class="v">θ</span>) = LBS&#8202;(&#8202;T̄ + B<sub>S</sub>(<span class="b">β</span>) + B<sub>P</sub>(<span class="v">θ</span>),&nbsp; J(<span class="b">β</span>),&nbsp; <span class="v">θ</span>,&nbsp; W&#8202;)</div>
+      <div class="terms">
+        <div><b>T̄</b> 模板网格（平均手）</div>
+        <div><b>B<sub>S</sub>(β)</b> 形状混合形变</div>
+        <div><b>B<sub>P</sub>(θ)</b> 姿态校正形变</div>
+        <div><b>J(β)</b> 由形状回归出关节位置</div>
+        <div><b>W</b> 蒙皮权重</div>
+        <div><b>LBS</b> 线性混合蒙皮 + 姿态校正</div>
+      </div>
+    </div>
+
+    <p>读法：先在<strong>平均手</strong>上叠加「身份形变」和「姿态校正形变」得到静止网格，再用<strong>线性混合蒙皮</strong>按关节旋转把它「掰」成目标姿势。那个 B<sub>P</sub>(θ) 校正项专门修掉裸 LBS 在关节处的塌陷（俗称糖纸效应）——这就是名字里 "non-rigid deformation" 的来历。</p>
+    <p>另外有一个<strong>关节回归器 J</strong>：从网格顶点线性映射出 16 个三维关节位置。所以从网格能取关节，从关节也能定位网格——两边可逆地对应。</p>
+  </section>
+
+  <!-- ============ 5 ============ -->
+  <section>
+    <div class="sec-head">
+      <div class="sec-num">5</div>
+      <h2>对具身领域意味着什么<span class="en">Why this matters for embodied AI</span></h2>
+    </div>
+    <p>前面是定义，这一节是真正和你相关的部分。</p>
+
+    <div class="bridge">
+      <div class="bp">
+        <div class="n">1</div>
+        <div>
+          <h4>它是「人手」，不是「机器人手」</h4>
+          <p>MANO 的关节拓扑、连杆长度、DoF 全都对应人的解剖结构。要落到具体灵巧手（Shadow Hand、Allegro、Inspire、LEAP…），必须做 <strong>retargeting</strong>：把 MANO 的关节角/指尖位置映射到目标手的运动学。两者关节数、连杆比例、可达空间都不同，常出现不可行解与穿模——这是从 MANO 轨迹到真机之间绕不过的一层。</p>
+        </div>
+      </div>
+      <div class="bp">
+        <div class="n">2</div>
+        <div>
+          <h4>它是纯运动学，没有力 / 接触</h4>
+          <p>MANO 只描述<strong>几何与姿态</strong>（手长什么样、摆成什么形状），<strong>不含力、力矩、接触状态、刚度</strong>等任何动力学量。而 contact-rich 操作里真正决定成败的恰恰是接触信息。这也是「只预测 MANO 轨迹」的工作（如各类 WAM/数据引擎）离真机仍有距离的根因之一。</p>
+        </div>
+      </div>
+      <div class="bp">
+        <div class="n">3</div>
+        <div>
+          <h4>在 VLA / WAM 里，「动作」＝ 每帧的 MANO 状态序列</div></h4>
+          <p>把一帧的手部动作拆开，就是下表三块：<strong>全局腕部平移 + 全局腕部旋转 + 手指关节姿态</strong>。双手则翻倍。形状 β 通常固定、不计入逐帧动作。各类离线指标正是对到这三块（见下表）。</p>
+        </div>
+      </div>
+      <div class="bp">
+        <div class="n">4</div>
+        <div>
+          <h4>为什么大家用它给 ego 人手打「伪动作标签」</h4>
+          <p>ego 视频里没有机器人动作标签，但可以用手姿估计器从 RGB 拟合出 MANO 参数当伪标签。MANO 的<strong>低维、结构化、可微、连续</strong>特性，让它既能被估计器输出、又能被生成模型直接回归（连续表示天然配 flow matching / diffusion），还能<strong>渲染成图</strong>做可视化或控制信号。</p>
+        </div>
+      </div>
+    </div>
+
+    <h3 style="font-family:'Noto Serif SC';font-weight:700;font-size:17px;color:var(--blue-deep);margin:30px 0 14px">单手「动作向量」速查表</h3>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr><th style="width:24%">分量</th><th style="width:18%">维度</th><th style="width:30%">含义</th><th>对应的离线指标</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><b style="color:var(--blue)">腕部平移</b><br><span style="font-size:12px;color:var(--muted)">global translation</span></td>
+            <td><span class="m">3</span></td>
+            <td>手腕在三维空间里的位置 (x,y,z)</td>
+            <td class="metric">ADE / FDE / DTW（米）</td>
+          </tr>
+          <tr>
+            <td><b style="color:var(--blue)">腕部旋转</b><br><span style="font-size:12px;color:var(--muted)">global rotation</span></td>
+            <td><span class="m">3</span></td>
+            <td>手腕朝向（轴角 / 旋转）</td>
+            <td class="metric">ROT 测地角（度）</td>
+          </tr>
+          <tr>
+            <td><b style="color:var(--blue)">手指姿态</b><br><span style="font-size:12px;color:var(--muted)">finger pose</span></td>
+            <td><span class="m">45</span>　<span style="color:var(--muted);font-size:12px">或 PCA 压缩</span></td>
+            <td>15 个关节的弯曲/张开角度</td>
+            <td class="metric">Hand RMSE</td>
+          </tr>
+          <tr style="background:rgba(187,74,44,.05)">
+            <td><b style="color:var(--clay)">手形 β</b><br><span style="font-size:12px;color:var(--muted)">shape（非动作）</span></td>
+            <td><span class="m" style="color:var(--clay)">10</span></td>
+            <td>身份/尺码，<b style="color:var(--clay)">通常固定</b>，不逐帧预测</td>
+            <td style="color:var(--muted)">—</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note"><b>严谨提示　</b>具体论文（如 Donk）只说动作是「归一化的连续双手 MANO 轨迹」，<strong>并未公布每帧动作向量的精确维度与归一化方案</strong>。上表是按 MANO 标准结构 + 其评测指标做的概念性拆解，用来对应「指标在量哪一块」，而非论文给定的确切实现。</div>
+  </section>
+
+  <footer>
+    <div class="ref">
+      <b>原始模型</b>　J. Romero, D. Tzionas, M. J. Black.<br>
+      “Embodied Hands: Modeling and Capturing Hands and Bodies Together.”<br>
+      ACM Trans. Graphics (SIGGRAPH Asia), 2017　·　SMPL 家族手部分支
+    </div>
+  </footer>
+
+</div>
+</body>
+</html>

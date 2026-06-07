@@ -1,14 +1,23 @@
 # Egocentric & VLA Paper Pipelines
 
-本仓库收录围绕**第一人称（egocentric）人类视频**与 **Vision-Language-Action（VLA）策略学习**的代表性工作，对每篇论文给出从 `数据 → 处理 → 训练 → 推理` 的完整流程拆解（自包含静态 HTML 页面）。仓库持续更新，新增的 egocentric 相关工作将陆续收录。
+本仓库围绕**第一人称（egocentric）人类视频**与 **Vision-Language-Action（VLA）策略学习**整理学习与调研材料，分为两个独立维护、各自持续更新的分区：
+
+- **基础知识** —— 理解该方向所需的通用概念、参数模型与表示方法。
+- **前沿论文** —— 代表性工作从 `数据 → 处理 → 训练 → 推理` 的完整流程拆解（自包含静态 HTML 页面），按发布时间倒序排列。
 
 ## 在线访问
 
 GitHub Pages: **https://hjj04.github.io/egocentric-paper/**
 
-首页提供每篇工作的结构化摘要（核心贡献、开源状态、相关链接），并按发布时间倒序排列；点击各卡片可进入对应的完整流程拆解页面。
+首页分区展示，可按需各自扩充。
 
-## 收录列表（按发布时间倒序）
+## 基础知识
+
+| 主题 | 说明 | 链接 |
+| --- | --- | --- |
+| MANO 手部参数模型 | 面向具身领域讲清 MANO（手部 pose + shape 的可微分参数模型），是双手 MANO 轨迹 / 手部 6-DoF 位姿等动作表示的共同基础 | [打开](https://hjj04.github.io/egocentric-paper/MANO_hand_model_explained.html) |
+
+## 前沿论文（按发布时间倒序）
 
 | 工作 | 发布时间 | 开源状态 | 流程拆解 |
 | --- | --- | --- | --- |
@@ -18,7 +27,7 @@ GitHub Pages: **https://hjj04.github.io/egocentric-paper/**
 | JoyAI-RA 0.1 | 2026-04-23 | 未开源 | [打开](https://hjj04.github.io/egocentric-paper/joyai-ra-pipeline.html) |
 | DreamDojo | 2026-02-06 | 已开源（★913，NVIDIA） | [打开](https://hjj04.github.io/egocentric-paper/DreamDojo_pipeline.html) |
 
-## 摘要
+### 论文摘要
 
 - **Donk** — 同一个"视频-动作联合去噪器"：给定观测图像时作为灵巧手动作策略（从图像+语言预测未来双手 MANO 轨迹），不给图像时作为数据引擎（仅凭文本生成成对的交互视频+同步手部动作）。实验未含真机验证。
 - **HARP-VLA** — 从大规模无动作标签的人类视频中预训练可泛化 VLA 策略，同时缩小视觉表征 gap 与动作执行 gap。贡献：源相对+配对判别的对齐损失、潜动作学习与人机视觉对齐耦合的三阶段训练、robot-only adapter。

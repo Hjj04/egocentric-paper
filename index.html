@@ -17,6 +17,15 @@
   .lede code { background:var(--card2); padding:1px 6px; border-radius:5px; font-size:13px; }
   .divider { height:1px; background:var(--border); margin:28px 0 24px; border:0; }
   .count { color:var(--muted); font-size:13px; margin-bottom:20px; }
+  .nav { display:flex; gap:10px; margin-top:16px; }
+  .nav a { font-size:13px; color:var(--accent); text-decoration:none; border:1px solid var(--border);
+           border-radius:999px; padding:4px 14px; }
+  .nav a:hover { background:rgba(88,166,255,.1); }
+  .section-head { margin:36px 0 18px; }
+  .section-title { font-size:14px; font-weight:700; color:var(--accent); margin:0 0 5px;
+                   text-transform:uppercase; letter-spacing:1px; display:flex; align-items:center; gap:12px; }
+  .section-title::after { content:""; flex:1; height:1px; background:var(--border); }
+  .section-desc { margin:0; color:var(--muted); font-size:13.5px; }
   article.card { background:var(--card); border:1px solid var(--border); border-radius:14px;
                  padding:22px 24px; margin-bottom:20px; }
   .card-head { display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap; }
@@ -53,10 +62,29 @@
 <div class="wrap">
   <header class="top">
     <h1>Egocentric &amp; VLA Paper Pipelines</h1>
-    <p class="lede">围绕第一人称（egocentric）人类视频与 Vision-Language-Action（VLA）策略学习的代表性工作，逐篇给出从 <code>数据 → 处理 → 训练 → 推理</code> 的完整流程拆解。本仓库持续更新，新增工作将随时收录。</p>
+    <p class="lede">围绕第一人称（egocentric）人类视频与 Vision-Language-Action（VLA）策略学习整理的学习与调研合集：<b>基础知识</b>沉淀通用概念与模型，<b>前沿论文</b>逐篇给出从 <code>数据 → 处理 → 训练 → 推理</code> 的完整流程拆解。两个分区独立维护、各自持续更新。</p>
+    <nav class="nav"><a href="#basics">基础知识</a><a href="#frontier">前沿论文</a></nav>
   </header>
   <hr class="divider">
-  <div class="count">按发布时间倒序排列，越新的工作排在越前 · 当前收录 5 篇</div>
+
+  <div class="section-head" id="basics">
+    <h2 class="section-title">基础知识</h2>
+    <p class="section-desc">理解 egocentric / VLA 工作所需的通用概念、参数模型与表示方法。</p>
+  </div>
+  <article class="card">
+    <div class="card-head"><h2>MANO 手部参数模型</h2><span class="date">基础</span></div>
+    <div class="meta">
+      <span class="badge b-org">参数化模型</span>
+      <span class="badge">手部 / 双手轨迹</span>
+    </div>
+    <p class="tldr"><b>面向具身领域讲清 MANO：一个把人手姿态与形状压缩成低维参数（pose + shape）的可微分手部网格模型。</b>它是 Donk、HumanEgo 等工作中"双手 MANO 轨迹""手部 6-DoF 位姿"等动作表示的共同基础。</p>
+    <a class="view" href="MANO_hand_model_explained.html">查看完整讲解 →</a>
+  </article>
+
+  <div class="section-head" id="frontier">
+    <h2 class="section-title">前沿论文</h2>
+    <p class="section-desc">代表性工作的完整流程拆解，按发布时间倒序排列，越新的工作排在越前 · 当前收录 5 篇。</p>
+  </div>
   <article class="card">
     <div class="card-head"><h2>Donk</h2><span class="date">2026-06-02</span></div>
     <div class="meta">
